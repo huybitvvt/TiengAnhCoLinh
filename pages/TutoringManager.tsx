@@ -479,7 +479,10 @@ export const TutoringManager: React.FC = () => {
       result = result.filter(t => t.status === filterStatus);
     }
     if (filterDate) {
-      result = result.filter(t => t.scheduledDate === filterDate);
+      // Lọc theo ngày: chỉ loại các buổi có ngày hẹn khác ngày chọn.
+      // Các lịch bồi chưa có ngày hẹn (scheduledDate = null) vẫn được hiển thị
+      // để tránh việc auto-created tutoring từ điểm danh bị ẩn hoàn toàn.
+      result = result.filter(t => !t.scheduledDate || t.scheduledDate === filterDate);
     }
     // Filter by branch - look up class branch from className
     if (filterBranch) {
