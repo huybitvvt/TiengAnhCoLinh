@@ -14,6 +14,7 @@ import {
   Contract, ContractType, ContractCategory, ContractItem, PaymentMethod,
   Student, Course, Product, ContractStatus, Discount, ClassStatus, AppliedDiscount
 } from '../types';
+import { recalculateStudentStatus } from '../src/services/attendanceService';
 import { useAuth } from '../src/hooks/useAuth';
 import { useStudents } from '../src/hooks/useStudents';
 import { useContracts } from '../src/hooks/useContracts';
@@ -838,6 +839,14 @@ export const ContractCreation: React.FC = () => {
       }
       
       if (status === ContractStatus.PAID || status === ContractStatus.PARTIAL) {
+        // Sau khi hợp đồng đã được lưu, tính lại số buổi & trạng thái cho học viên này
+        if (selectedStudent?.id) {
+          try {
+            await recalculateStudentStatus(selectedStudent.id);
+          } catch (err) {
+            console.error('Error recalculating student status after contract:', err);
+          }
+        }
         // Show preview for paid/partial contracts
         setCreatedContract({
           ...contractData,

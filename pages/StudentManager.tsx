@@ -36,8 +36,9 @@ import { ModalPortal } from '@/components/modal-portal';
 
 // Constants for table column count
 const STUDENT_TABLE_COLUMNS = {
-  base: 14,  // Standard columns count + selection checkbox column (added Đã học(Cũ))
-  withDropoutReason: 15  // When showing dropout reason column
+  // Thêm 2 cột: "Tổng số buổi" và "Buổi đã học"
+  base: 16,
+  withDropoutReason: 17
 };
 
 interface StudentManagerProps {
@@ -625,9 +626,12 @@ export const StudentManager: React.FC<StudentManagerProps> = ({
                     <th className="px-4 py-3 bg-gray-50">Phụ huynh</th>
                     <th className="px-4 py-3 bg-gray-50">Lớp học</th>
                     <th className="px-4 py-3 bg-gray-50 text-center">Gói học</th>
+                    <th className="px-4 py-3 bg-gray-50 text-center">Đã học (cũ)</th>
+                    <th className="px-4 py-3 bg-gray-50 text-center">Tổng số buổi</th>
+                    <th className="px-4 py-3 bg-gray-50 text-center">Buổi đã học</th>
                     <th className="px-4 py-3 bg-gray-50 text-center">Đã điểm danh</th>
                     <th className="px-4 py-3 bg-gray-50 text-center">Còn lại</th>
-                    <th className="px-4 py-3 bg-gray-50 text-center">Đã học</th>
+                    <th className="px-4 py-3 bg-gray-50 text-center">Đã học (cũ)</th>
                     <th className="px-4 py-3 bg-gray-50 text-center">Ngày BĐ</th>
                     <th className="px-4 py-3 bg-gray-50 text-center">Ngày KT</th>
                     <th className="px-4 py-3 bg-gray-50">HĐ gần nhất</th>
@@ -698,15 +702,49 @@ export const StudentManager: React.FC<StudentManagerProps> = ({
                     <td className="px-4 py-3 text-xs text-gray-600">
                        <p>{student.class || '---'}</p>
                     </td>
+                    {/* Gói học (theo dữ liệu hiện tại / import) */}
                     <td className="px-4 py-3 text-center">
-                       <span className="font-semibold text-blue-600">{getStudentSessionData(student).registered}</span>
+                       <span className="font-semibold text-blue-600">
+                         {getStudentSessionData(student).registered}
+                       </span>
                     </td>
+                    {/* Đã học (cũ) - legacy system */}
                     <td className="px-4 py-3 text-center">
-                       <span className="font-semibold text-green-600">{getStudentSessionData(student).attended}</span>
+                       <span className="font-semibold text-gray-600">
+                         {getStudentSessionData(student).legacyAttended}
+                       </span>
                     </td>
+                    {/* Tổng số buổi đăng ký do hệ thống tính (bao gồm hợp đồng cũ + mới) */}
+                    <td className="px-4 py-3 text-center">
+                       <span className="font-semibold text-emerald-600">
+                         {student.registeredSessions || 0}
+                       </span>
+                    </td>
+                    {/* Buổi đã học = Đã điểm danh (mới) + Đã học (cũ) */}
                     <td className="px-4 py-3 text-center">
                        {(() => {
-                         const { remaining } = getStudentSessionData(student);
+                         const { attended, legacyAttended } = getStudentSessionData(student);
+                         const totalLearned = attended + legacyAttended;
+                         return (
+                           <span className="font-semibold text-purple-600">
+                             {totalLearned}
+                           </span>
+                         );
+                       })()}
+                    </td>
+                    {/* Đã điểm danh (hệ thống mới) */}
+                    <td className="px-4 py-3 text-center">
+                       <span className="font-semibold text-green-600">
+                         {getStudentSessionData(student).attended}
+                       </span>
+                    </td>
+                    {/* Còn lại = Tổng số buổi - Buổi đã học */}
+                    <td className="px-4 py-3 text-center">
+                       {(() => {
+                         const totalSessions = student.registeredSessions || 0;
+                         const { attended, legacyAttended } = getStudentSessionData(student);
+                         const learned = attended + legacyAttended;
+                         const remaining = totalSessions - learned;
                          return (
                            <span className={`font-bold ${remaining < 0 ? 'text-red-600' : remaining <= 5 ? 'text-orange-500' : 'text-gray-700'}`}>
                              {remaining}
@@ -714,9 +752,6 @@ export const StudentManager: React.FC<StudentManagerProps> = ({
                            </span>
                          );
                        })()}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                       <span className="font-semibold text-gray-600">{getStudentSessionData(student).legacyAttended}</span>
                     </td>
                     <td className="px-4 py-3 text-center text-xs text-gray-600">
                        {student.startDate ? new Date(student.startDate).toLocaleDateString('vi-VN') : '---'}
