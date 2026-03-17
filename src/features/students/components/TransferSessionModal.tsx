@@ -27,12 +27,22 @@ export interface TransferSessionModalProps {
 
 export const TransferSessionModal: React.FC<TransferSessionModalProps> = ({ student, allStudents, staffData, onClose, onSubmit }) => {
   const [targetStudentId, setTargetStudentId] = useState('');
+  const [targetStudentQuery, setTargetStudentQuery] = useState('');
+  const [isTargetStudentOpen, setIsTargetStudentOpen] = useState(false);
   const [sessions, setSessions] = useState(0);
   const [note, setNote] = useState('');
 
   const currentSessions = student.registeredSessions || 0;
   const targetStudent = allStudents.find(s => s.id === targetStudentId);
   const otherStudents = allStudents.filter(s => s.id !== student.id && s.status !== StudentStatus.DROPPED);
+  const normalizedQuery = targetStudentQuery.trim().toLowerCase();
+  const filteredStudents = normalizedQuery
+    ? otherStudents.filter(s => {
+        const name = (s.fullName || '').toLowerCase();
+        const className = (s.class || '').toLowerCase();
+        return name.includes(normalizedQuery) || className.includes(normalizedQuery);
+      })
+    : otherStudents;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,17 +84,54 @@ export const TransferSessionModal: React.FC<TransferSessionModalProps> = ({ stud
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Học viên nhận <span className="text-red-500">*</span></label>
-            <select
-              required
-              value={targetStudentId}
-              onChange={(e) => setTargetStudentId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">-- Chọn học viên --</option>
-              {otherStudents.map(s => (
-                <option key={s.id} value={s.id}>{s.fullName} - {s.class || 'Chưa có lớp'}</option>
-              ))}
-            </select>
+            <div className="relative">
+              <input
+                value={targetStudentQuery}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setTargetStudentQuery(next);
+                  setIsTargetStudentOpen(true);
+                  setTargetStudentId('');
+                }}
+                onFocus={() => setIsTargetStudentOpen(true)}
+                onBlur={() => {
+                  // Delay close to allow click selection
+                  window.setTimeout(() => setIsTargetStudentOpen(false), 150);
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                placeholder="Gõ để tìm học viên..."
+                aria-label="Học viên nhận"
+                autoComplete="off"
+              />
+
+              {isTargetStudentOpen && (
+                <div className="absolute mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-auto z-10">
+                  {filteredStudents.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-gray-500">Không tìm thấy học viên phù hợp</div>
+                  ) : (
+                    filteredStudents.slice(0, 30).map(s => {
+                      const label = `${s.fullName} - ${s.class || 'Chưa có lớp'}`;
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setTargetStudentId(s.id);
+                            setTargetStudentQuery(label);
+                            setIsTargetStudentOpen(false);
+                          }}
+                        >
+                          <div className="font-medium text-gray-900">{s.fullName}</div>
+                          <div className="text-xs text-gray-600">{s.class || 'Chưa có lớp'}</div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {targetStudent && (

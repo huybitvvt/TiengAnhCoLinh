@@ -244,10 +244,12 @@ const TrashModal: React.FC<{
 const StatusStepper: React.FC<{
   currentStatus: TutoringStatus;
   onStatusChange: (status: TutoringStatus, reason?: string) => void;
+  onDelete?: () => void;
   disabled?: boolean;
   canUndo?: boolean;
+  canDelete?: boolean;
   chargedReason?: string;  // Show reason for Nghỉ tính phí
-}> = ({ currentStatus, onStatusChange, disabled, canUndo, chargedReason }) => {
+}> = ({ currentStatus, onStatusChange, onDelete, disabled, canUndo, canDelete, chargedReason }) => {
   const [showOptions, setShowOptions] = useState(false);
   const [showReasonModal, setShowReasonModal] = useState(false);
 
@@ -315,6 +317,22 @@ const StatusStepper: React.FC<{
               <PauseCircle size={14} />
               Nghỉ bảo lưu
             </button>
+
+            {canDelete && onDelete && (
+              <>
+                <div className="my-1 border-t border-gray-100" />
+                <button
+                  onClick={() => {
+                    setShowOptions(false);
+                    onDelete();
+                  }}
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-rose-50 text-rose-700 flex items-center gap-2"
+                >
+                  <Trash2 size={14} />
+                  Xóa
+                </button>
+              </>
+            )}
           </div>
         )}
 
@@ -388,7 +406,8 @@ export const TutoringManager: React.FC = () => {
   const [showTrashModal, setShowTrashModal] = useState(false);  // NEW: Trash view
   const [selectedTutoring, setSelectedTutoring] = useState<TutoringData | null>(null);
   const [filterStatus, setFilterStatus] = useState<TutoringStatus | ''>('');
-  const [filterDate, setFilterDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [filterScheduledDate, setFilterScheduledDate] = useState<string>(new Date().toISOString().split('T')[0]); // Ngày hẹn bồi
+  const [filterAbsentDate, setFilterAbsentDate] = useState<string>(''); // Ngày vắng buổi học
   const [filterBranch, setFilterBranch] = useState<string>('');  // Branch/campus filter
 
   // Confirmation modal state
@@ -478,11 +497,14 @@ export const TutoringManager: React.FC = () => {
     if (filterStatus) {
       result = result.filter(t => t.status === filterStatus);
     }
-    if (filterDate) {
-      // Lọc theo ngày: chỉ loại các buổi có ngày hẹn khác ngày chọn.
-      // Các lịch bồi chưa có ngày hẹn (scheduledDate = null) vẫn được hiển thị
-      // để tránh việc auto-created tutoring từ điểm danh bị ẩn hoàn toàn.
-      result = result.filter(t => !t.scheduledDate || t.scheduledDate === filterDate);
+    if (filterScheduledDate) {
+      // Ngày hẹn bồi: vẫn hiển thị các lịch chưa hẹn (scheduledDate = null)
+      // để không làm "mất" các lịch auto-created từ điểm danh.
+      result = result.filter(t => !t.scheduledDate || t.scheduledDate === filterScheduledDate);
+    }
+    if (filterAbsentDate) {
+      // Ngày vắng buổi học: chỉ hiển thị đúng ngày vắng (absentDate)
+      result = result.filter(t => t.absentDate === filterAbsentDate);
     }
     // Filter by branch - look up class branch from className
     if (filterBranch) {
@@ -490,7 +512,7 @@ export const TutoringManager: React.FC = () => {
       result = result.filter(t => branchClasses.includes(t.className));
     }
     return result;
-  }, [tutoringList, filterStatus, filterDate, filterBranch, allClasses]);
+  }, [tutoringList, filterStatus, filterScheduledDate, filterAbsentDate, filterBranch, allClasses]);
 
   // Count for today
   const todayCount = tutoringList.filter(t => t.scheduledDate === new Date().toISOString().split('T')[0]).length;
@@ -665,27 +687,51 @@ export const TutoringManager: React.FC = () => {
           </>
         )}
 
-        {/* Date Filter */}
-        <div className="flex items-center gap-2">
-          <Calendar size={16} className="text-gray-400" />
-          <input
-            type="date"
-            value={filterDate}
-            onChange={(e) => setFilterDate(e.target.value)}
-            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
-          />
-          <button
-            onClick={() => setFilterDate(new Date().toISOString().split('T')[0])}
-            className="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-200"
-          >
-            Hôm nay ({todayCount})
-          </button>
-          <button
-            onClick={() => setFilterDate('')}
-            className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200"
-          >
-            Tất cả ngày
-          </button>
+        {/* Date Filters */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Ngày hẹn bồi */}
+          <div className="flex items-center gap-2">
+            <CalendarCheck size={16} className="text-gray-400" />
+            <span className="text-xs font-medium text-gray-600">Ngày hẹn bồi</span>
+            <input
+              type="date"
+              value={filterScheduledDate}
+              onChange={(e) => setFilterScheduledDate(e.target.value)}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+            />
+            <button
+              onClick={() => setFilterScheduledDate(new Date().toISOString().split('T')[0])}
+              className="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-200"
+            >
+              Hôm nay ({todayCount})
+            </button>
+            <button
+              onClick={() => setFilterScheduledDate('')}
+              className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200"
+            >
+              Tất cả
+            </button>
+          </div>
+
+          <div className="w-px h-6 bg-gray-200" />
+
+          {/* Ngày vắng buổi học */}
+          <div className="flex items-center gap-2">
+            <Calendar size={16} className="text-gray-400" />
+            <span className="text-xs font-medium text-gray-600">Ngày vắng buổi học</span>
+            <input
+              type="date"
+              value={filterAbsentDate}
+              onChange={(e) => setFilterAbsentDate(e.target.value)}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+            />
+            <button
+              onClick={() => setFilterAbsentDate('')}
+              className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200"
+            >
+              Tất cả
+            </button>
+          </div>
         </div>
 
         <div className="w-px h-6 bg-gray-200" />
@@ -698,7 +744,7 @@ export const TutoringManager: React.FC = () => {
               filterStatus === '' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            Tất cả ({tutoringList.filter(t => !filterDate || t.scheduledDate === filterDate).length})
+            Tất cả ({filteredList.length})
           </button>
           <button
             onClick={() => setFilterStatus('Chưa bồi')}
@@ -777,7 +823,9 @@ export const TutoringManager: React.FC = () => {
                   <StatusStepper
                     currentStatus={session.status}
                     onStatusChange={(newStatus, reason) => handleStatusChange(session, newStatus, reason)}
+                    onDelete={() => session.id && handleDelete(session.id)}
                     canUndo={canUndo}
+                    canDelete={canDeleteTutoring}
                     chargedReason={session.chargedReason}
                   />
                   {canDeleteTutoring && (

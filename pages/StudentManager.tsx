@@ -37,8 +37,8 @@ import { ModalPortal } from '@/components/modal-portal';
 // Constants for table column count
 const STUDENT_TABLE_COLUMNS = {
   // Thêm 2 cột: "Tổng số buổi" và "Buổi đã học"
-  base: 16,
-  withDropoutReason: 17
+  base: 17,
+  withDropoutReason: 18
 };
 
 interface StudentManagerProps {
@@ -77,6 +77,7 @@ export const StudentManager: React.FC<StudentManagerProps> = ({
   const [showLegacyImportModal, setShowLegacyImportModal] = useState(false);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkSyncing, setBulkSyncing] = useState(false);
   
   // Post-creation modal state
   const [showPostCreateModal, setShowPostCreateModal] = useState(false);
@@ -396,6 +397,44 @@ export const StudentManager: React.FC<StudentManagerProps> = ({
     alert(`Đã xóa ${deleted} học viên.${failed > 0 ? ` Lỗi: ${failed}` : ''}`);
   };
 
+  // Đồng bộ tính toán các trường (attended/remaining/status/classProgress) cho các học viên đã tick chọn
+  const handleBulkSyncCalculatedFields = async () => {
+    if (selectedStudentIds.length === 0) {
+      alert('Vui lòng chọn ít nhất 1 học viên để đồng bộ.');
+      return;
+    }
+
+    const confirmMsg = `Đồng bộ tính toán cho ${selectedStudentIds.length} học viên đã chọn?\n\nHệ thống sẽ tính lại: Đã điểm danh, Còn lại, Trạng thái (nếu áp dụng) theo dữ liệu điểm danh.`;
+    if (!confirm(confirmMsg)) return;
+
+    setBulkSyncing(true);
+    let success = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    // Prefer to use current in-memory data to pass classId when possible
+    const byId = new Map(students.map(s => [s.id, s]));
+
+    for (const id of selectedStudentIds) {
+      const s = byId.get(id);
+      try {
+        await recalculateStudentStatus(id, s?.classId || undefined);
+        success++;
+      } catch (err: any) {
+        failed++;
+        const name = s?.fullName || id;
+        errors.push(`${name}: ${err?.message || 'Lỗi đồng bộ'}`);
+        console.error('Bulk sync error:', name, err);
+      }
+    }
+
+    setBulkSyncing(false);
+    alert(
+      `Đã đồng bộ ${success}/${selectedStudentIds.length} học viên.` +
+        (failed > 0 ? `\nLỗi: ${failed}\n- ${errors.slice(0, 8).join('\n- ')}${errors.length > 8 ? '\n- ...' : ''}` : '')
+    );
+  };
+
   // Import students from Excel
   const handleImportStudents = async (data: Record<string, any>[]): Promise<{ success: number; errors: string[] }> => {
     const errors: string[] = [];
@@ -536,6 +575,19 @@ export const StudentManager: React.FC<StudentManagerProps> = ({
             entityName="học viên"
           />
 
+          {/* Nút đồng bộ tính toán (bulk) */}
+          {canEditStudent && (
+            <button
+              onClick={handleBulkSyncCalculatedFields}
+              disabled={bulkSyncing || selectedStudentIds.length === 0}
+              className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium disabled:opacity-50"
+              title="Tính lại Đã điểm danh/Còn lại/Trạng thái theo dữ liệu điểm danh"
+            >
+              <RefreshCw size={16} />
+              {bulkSyncing ? 'Đang đồng bộ...' : `Đồng bộ (${selectedStudentIds.length})`}
+            </button>
+          )}
+
           {/* Nút xóa đã chọn - chỉ hiện khi có quyền xóa */}
           {canDeleteStudent && (
             <button 
@@ -631,7 +683,6 @@ export const StudentManager: React.FC<StudentManagerProps> = ({
                     <th className="px-4 py-3 bg-gray-50 text-center">Buổi đã học</th>
                     <th className="px-4 py-3 bg-gray-50 text-center">Đã điểm danh</th>
                     <th className="px-4 py-3 bg-gray-50 text-center">Còn lại</th>
-                    <th className="px-4 py-3 bg-gray-50 text-center">Đã học (cũ)</th>
                     <th className="px-4 py-3 bg-gray-50 text-center">Ngày BĐ</th>
                     <th className="px-4 py-3 bg-gray-50 text-center">Ngày KT</th>
                     <th className="px-4 py-3 bg-gray-50">HĐ gần nhất</th>
@@ -908,6 +959,17 @@ export const StudentManager: React.FC<StudentManagerProps> = ({
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
+                                      navigate('/finance/contracts/create', { state: { studentId: student.id } });
+                                      setActionDropdownId(null);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                                  >
+                                    <DollarSign size={14} className="text-emerald-600" />
+                                    Thanh toán
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       handleRecalculateStatus(student);
                                       setActionDropdownId(null);
                                     }}
@@ -953,7 +1015,19 @@ export const StudentManager: React.FC<StudentManagerProps> = ({
               <div className="p-6 border-b border-gray-100 bg-teal-50/30">
                  <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold text-gray-900 text-lg">Thông tin học viên</h3>
-                    <button className="text-gray-400 hover:text-gray-600"><MoreHorizontal size={18} /></button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSelectedStudent(null)}
+                        className="text-gray-400 hover:text-gray-700 p-1 rounded-md hover:bg-white/60"
+                        title="Đóng"
+                        aria-label="Đóng panel thông tin học viên"
+                      >
+                        <X size={18} />
+                      </button>
+                      <button className="text-gray-400 hover:text-gray-600 p-1 rounded-md hover:bg-white/60" title="Tùy chọn">
+                        <MoreHorizontal size={18} />
+                      </button>
+                    </div>
                  </div>
                  
                  <div className="mb-4">
