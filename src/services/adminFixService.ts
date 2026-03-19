@@ -180,7 +180,7 @@ export const recalculateClassStudentData = async (
         const skipStatuses = [StudentStatus.DROPPED, StudentStatus.RESERVED, StudentStatus.TRIAL, StudentStatus.CONTRACT_DEBT];
 
         if (!skipStatuses.includes(student.status)) {
-            if (registeredSessions > 0) {
+            if (registeredSessions > 0 && student.status !== StudentStatus.DROPPED) {
                 if (actualRemaining < 0) {
                     newStatus = StudentStatus.DEBT;
                 } else if (actualRemaining === 0) {

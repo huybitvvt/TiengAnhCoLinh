@@ -39,8 +39,14 @@ export const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ parents,
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Auto-set status = 'Nợ phí' nếu số buổi còn lại < 0
-    const finalStatus = formData.remainingSessions < 0 ? StudentStatus.DEBT : formData.status;
+    // If user explicitly chooses "Nghỉ học", keep it even when remainingSessions < 0.
+    // Otherwise, auto-set status = 'Nợ phí' when remainingSessions < 0.
+    const finalStatus =
+      formData.status === StudentStatus.DROPPED
+        ? StudentStatus.DROPPED
+        : formData.remainingSessions < 0
+          ? StudentStatus.DEBT
+          : formData.status;
 
     const submitData: any = {
       fullName: formData.fullName,

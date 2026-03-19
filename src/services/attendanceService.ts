@@ -505,14 +505,15 @@ export const checkAndUpdateStudentDebtStatus = async (
     if (registeredSessions > 0) {
       if (remainingSessions < 0) {
         // Negative remaining = "Nợ phí" (debt)
-        if (currentStatus !== StudentStatus.DEBT) {
+        // Không override nếu status hiện tại là Nghỉ học
+        if (currentStatus !== StudentStatus.DEBT && currentStatus !== StudentStatus.DROPPED) {
           await updateDoc(studentRef, {
             status: StudentStatus.DEBT,
             debtStartDate: new Date().toISOString(),
             debtSessions: Math.abs(remainingSessions)
           });
           console.log(`[checkDebtStatus] Student ${studentId} status changed to "Nợ phí" (attended: ${attendedSessions}, registered: ${registeredSessions}, remaining: ${remainingSessions})`);
-        } else {
+        } else if (currentStatus === StudentStatus.DEBT) {
           // Already in debt, just update debtSessions
           await updateDoc(studentRef, {
             debtSessions: Math.abs(remainingSessions)

@@ -235,19 +235,8 @@ export const onStudentAttendanceCreate = functions
         updateData.startDate = data.date || new Date().toISOString().split('T')[0];
       }
 
-      // Check debt/expired status
-      if (registeredSessions > 0 && studentData.status === 'Đang học') {
-        if ((newAttended + legacyAttended) > registeredSessions) {
-          updateData.status = 'Nợ phí';
-          updateData.debtStartDate = new Date().toISOString();
-          updateData.debtSessions = (newAttended + legacyAttended) - registeredSessions;
-          console.log(`[onStudentAttendanceCreate] Student ${studentId} changed to "Nợ phí" (attended: ${newAttended}, legacy: ${legacyAttended}, registered: ${registeredSessions})`);
-        } else if ((newAttended + legacyAttended) === registeredSessions) {
-          updateData.status = 'Đã học hết phí';
-          updateData.debtSessions = 0;
-          console.log(`[onStudentAttendanceCreate] Student ${studentId} changed to "Đã học hết phí" (attended: ${newAttended}, registered: ${registeredSessions})`);
-        }
-      }
+      // BỎ logic auto set status "Nợ phí" nếu trạng thái hiện tại không phải "Đang học"
+      // Chỉ cập nhật status nếu thực sự muốn override từ phía client/admin
 
       // Track makeup separately for reporting, but still count toward attendedSessions
       if (!isSessionAttendance) {
@@ -377,15 +366,8 @@ export const onStudentAttendanceUpdate = functions
     updateData.remainingSessions = remaining;
     updateData.expectedEndDate = expectedEndDate;
 
-    // Check debt status
-    if (registeredSessions > 0 && (newAttended + legacyAttended) > registeredSessions && studentData.status === 'Đang học') {
-      updateData.status = 'Nợ phí';
-      updateData.debtStartDate = new Date().toISOString();
-      updateData.debtSessions = (newAttended + legacyAttended) - registeredSessions;
-    } else if ((newAttended + legacyAttended) <= registeredSessions && studentData.status === 'Nợ phí') {
-      updateData.status = 'Đang học';
-      updateData.debtSessions = admin.firestore.FieldValue.delete();
-    }
+    // BỎ logic auto set status "Nợ phí" nếu trạng thái hiện tại không phải "Đang học"
+    // Chỉ cập nhật status nếu thực sự muốn override từ phía client/admin
 
     // Track makeup separately for reporting
     if (!isSessionAttendance) {

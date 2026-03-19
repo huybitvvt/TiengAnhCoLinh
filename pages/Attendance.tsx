@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Calendar, Save, CheckCircle, AlertCircle, Clock, BookOpen, Users, Plus, ClipboardCheck, XCircle, AlertTriangle, ChevronDown, Trash2 } from 'lucide-react';
 import { ModalPortal } from '@/components/modal-portal';
 import { SearchableClassDropdown } from '../src/features/attendance';
@@ -72,11 +73,31 @@ export const Attendance: React.FC = () => {
   const { user, staffData } = useAuth();
   const { shouldShowOnlyOwnClasses, staffId } = usePermissions();
   const onlyOwnClasses = shouldShowOnlyOwnClasses('attendance');
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const { classes: allClasses, loading: classLoading } = useClasses();
   const { students: allStudents, loading: studentLoading } = useStudents();
   const { checkExisting, loadStudentAttendance, studentAttendance, saveAttendance } = useAttendance();
   const { holidays } = useHolidays();
+
+  const isValidDateParam = useCallback((v: string | null) => {
+    if (!v) return false;
+    // Expect YYYY-MM-DD
+    return /^\d{4}-\d{2}-\d{2}$/.test(v);
+  }, []);
+
+  const sanitizeTabParam = useCallback((v: string | null) => {
+    return v === 'review' ? 'review' : 'attendance';
+  }, []);
+
+  // Helper function to get today's date in local timezone (YYYY-MM-DD)
+  const getTodayLocalDate = (): string => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
   // Helper: Check if a date is a holiday for a specific class
   const getHolidayForDate = (dateStr: string, classId?: string): Holiday | null => {
@@ -123,9 +144,11 @@ export const Attendance: React.FC = () => {
   }, [allClasses, onlyOwnClasses, staffData, staffId]);
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'attendance' | 'review'>('attendance');
+  const [activeTab, setActiveTab] = useState<'attendance' | 'review'>(() =>
+    sanitizeTabParam(searchParams.get('tab')) as 'attendance' | 'review'
+  );
 
-  const [selectedClassId, setSelectedClassId] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState(() => searchParams.get('classId') || '');
   const [selectedSession, setSelectedSession] = useState<ClassSession | null>(null);
   const [sessionDropdownOpen, setSessionDropdownOpen] = useState(false);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 420, maxHeight: 400 });
@@ -133,22 +156,19 @@ export const Attendance: React.FC = () => {
   const dropdownPanelRef = useRef<HTMLDivElement>(null);
   const sessionButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Helper function to get today's date in local timezone (YYYY-MM-DD)
-  const getTodayLocalDate = (): string => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  const [attendanceDate, setAttendanceDate] = useState(getTodayLocalDate());
+  const [attendanceDate, setAttendanceDate] = useState(() => {
+    const dateParam = searchParams.get('date');
+    return isValidDateParam(dateParam) ? (dateParam as string) : getTodayLocalDate();
+  });
   const [attendanceData, setAttendanceData] = useState<StudentAttendanceState[]>([]);
   const [existingRecord, setExistingRecord] = useState<AttendanceRecord | null>(null);
   const [saving, setSaving] = useState(false);
   const [isResetting, setIsResetting] = useState(false); // Flag to prevent sync useEffect from overwriting reset
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [useSessionMode, setUseSessionMode] = useState(true); // Default to session mode
+  const [useSessionMode, setUseSessionMode] = useState(() => {
+    const mode = searchParams.get('mode');
+    return mode === 'manual' ? false : true;
+  }); // Default to session mode
   const [showAddSessionModal, setShowAddSessionModal] = useState(false);
   const [showGradeFields, setShowGradeFields] = useState(false); // Toggle hiển thị điểm số
   const [generatingSessions, setGeneratingSessions] = useState(false); // Loading state for auto-generate sessions
@@ -160,9 +180,12 @@ export const Attendance: React.FC = () => {
 
   // Bug 3 fix: Track session IDs that have attendance records
   const [completedSessionIds, setCompletedSessionIds] = useState<Set<string>>(new Set());
+  const [completedDates, setCompletedDates] = useState<Set<string>>(new Set());
 
   // Review tab state
   const [reviewDate, setReviewDate] = useState<string>(() => {
+    const p = searchParams.get('reviewDate');
+    if (isValidDateParam(p)) return p as string;
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     return yesterday.toISOString().split('T')[0];
@@ -206,6 +229,81 @@ export const Attendance: React.FC = () => {
     } : undefined
   });
 
+  // Persist key filters to URL so refresh doesn't lose context
+  useEffect(() => {
+    // Use functional update so we don't depend on the `searchParams` object in deps
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+
+      const setOrDelete = (k: string, v: string | null | undefined) => {
+        if (v) next.set(k, v);
+        else next.delete(k);
+      };
+
+      setOrDelete('tab', activeTab);
+      setOrDelete('classId', selectedClassId || null);
+      setOrDelete('date', attendanceDate || null);
+      setOrDelete('mode', useSessionMode ? 'session' : 'manual');
+      setOrDelete('reviewDate', reviewDate || null);
+
+      // Note: sessionId is managed in its own effect (depends on selectedSession)
+
+      return next;
+    }, { replace: true });
+  }, [activeTab, selectedClassId, attendanceDate, useSessionMode, reviewDate, setSearchParams]);
+
+  // Persist selected session to URL (and restore on refresh)
+  useEffect(() => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (selectedSession?.id) next.set('sessionId', selectedSession.id);
+      else next.delete('sessionId');
+      return next;
+    }, { replace: true });
+  }, [selectedSession?.id, setSearchParams]);
+
+  // Auto-restore selected session from URL OR by matching date
+  useEffect(() => {
+    if (!useSessionMode) return;
+    if (!selectedClassId) return;
+    if (sessionsLoading) return;
+    if (allSessions.length === 0) return;
+    if (selectedSession) return;
+
+    const sessionIdParam = searchParams.get('sessionId');
+    const fromParam = sessionIdParam ? allSessions.find(s => s.id === sessionIdParam) : undefined;
+    if (fromParam) {
+      setSelectedSession(fromParam);
+      if (fromParam.date && fromParam.date !== attendanceDate) {
+        setAttendanceDate(fromParam.date);
+      }
+      return;
+    }
+
+    if (!attendanceDate) return;
+    const matching = allSessions.find(s => s.date === attendanceDate);
+    if (!matching) return;
+
+    // Don't auto-select sessions that already have attendance
+    const hasAttendance =
+      completedSessionIds.has(matching.id) ||
+      completedDates.has(matching.date) ||
+      !!matching.attendanceId;
+    if (hasAttendance) return;
+
+    setSelectedSession(matching);
+  }, [
+    useSessionMode,
+    selectedClassId,
+    sessionsLoading,
+    allSessions,
+    selectedSession,
+    searchParams.get('sessionId'),
+    attendanceDate,
+    completedSessionIds,
+    completedDates,
+  ]);
+
   // Close dropdown on page scroll or resize (but NOT when scrolling inside dropdown)
   const handlePageScroll = useCallback((e: Event) => {
     // Ignore scroll events from inside the dropdown panel
@@ -226,9 +324,6 @@ export const Attendance: React.FC = () => {
   useEffect(() => {
     setSessionDropdownOpen(false);
   }, [selectedClassId]);
-
-  // Bug 3 fix: Load completed session IDs AND dates from attendance records with realtime listener
-  const [completedDates, setCompletedDates] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!selectedClassId) {
@@ -1427,8 +1522,8 @@ export const Attendance: React.FC = () => {
                         {[...allSessions]
                           .filter(s => s.sessionNumber > 0) // Bug 2 fix: Filter out sessions with invalid sessionNumber
                           .sort((a, b) => {
-                            // Sort by session number (user expects sequential order)
-                            return a.sessionNumber - b.sessionNumber;
+                            // Sort by date descending (ngày lớn lên trước)
+                            return b.date.localeCompare(a.date);
                           })
                           .map(s => {
                           const today = new Date().toISOString().split('T')[0];

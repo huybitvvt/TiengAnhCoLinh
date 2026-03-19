@@ -331,7 +331,13 @@ export const StudentManager: React.FC<StudentManagerProps> = ({
       setEditingStudent(null);
     } catch (err) {
       console.error('Error updating student:', err);
-      alert('Không thể cập nhật học viên. Vui lòng thử lại.');
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'string'
+            ? err
+            : 'Lỗi không xác định khi cập nhật học viên.';
+      alert(`Không thể cập nhật học viên: ${msg}`);
     }
   };
 
@@ -1441,35 +1447,49 @@ export const StudentManager: React.FC<StudentManagerProps> = ({
             setActionStudent(null);
           }}
           onSubmit={async (data) => {
-            const oldClass = actionStudent.class || '';
-            const updateData: Record<string, any> = {
-              classId: '',
-              class: '',
-              status: data.newStatus
-            };
-            // Nếu nghỉ học, lưu lý do và ngày nghỉ
-            if (data.newStatus === StudentStatus.DROPPED) {
-              updateData.dropoutReason = data.note || '';
-              updateData.dropoutDate = new Date().toISOString();
+            try {
+              const oldClass = actionStudent.class || '';
+              const updateData: Record<string, any> = {
+                classId: '',
+                class: '',
+                status: data.newStatus
+              };
+              // Nếu nghỉ học, lưu lý do và ngày nghỉ
+              if (data.newStatus === StudentStatus.DROPPED) {
+                updateData.dropoutReason = data.note || '';
+                updateData.dropoutDate = new Date().toISOString();
+              }
+
+              await updateStudent(actionStudent.id, updateData);
+
+              // Log
+              await createEnrollment({
+                studentId: actionStudent.id,
+                studentName: actionStudent.fullName,
+                classId: '',
+                className: '',
+                sessions: 0,
+                type: 'Xóa khỏi lớp',
+                reason: `Xóa khỏi lớp ${oldClass}. ${data.note}`,
+                note: `Xóa khỏi lớp ${oldClass}. ${data.note}`,
+                createdBy: staffData?.name || 'Admin',
+                createdAt: new Date().toISOString(),
+                createdDate: new Date().toLocaleDateString('vi-VN'),
+                finalAmount: 0,
+              });
+
+              setShowRemoveClassModal(false);
+              setActionStudent(null);
+            } catch (err) {
+              console.error('[RemoveClassModal] Error:', err);
+              const msg =
+                err instanceof Error
+                  ? err.message
+                  : typeof err === 'string'
+                    ? err
+                    : 'Lỗi không xác định';
+              alert(`Không thể lưu thay đổi: ${msg}`);
             }
-            await updateStudent(actionStudent.id, updateData);
-            // Log
-            await createEnrollment({
-              studentId: actionStudent.id,
-              studentName: actionStudent.fullName,
-              classId: '',
-              className: '',
-              sessions: 0,
-              type: 'Xóa khỏi lớp',
-              reason: `Xóa khỏi lớp ${oldClass}. ${data.note}`,
-              note: `Xóa khỏi lớp ${oldClass}. ${data.note}`,
-              createdBy: staffData?.name || 'Admin',
-              createdAt: new Date().toISOString(),
-              createdDate: new Date().toLocaleDateString('vi-VN'),
-              finalAmount: 0,
-            });
-            setShowRemoveClassModal(false);
-            setActionStudent(null);
           }}
         />
       )}

@@ -7,6 +7,7 @@
 import React, { useState } from 'react';
 import { Student, StudentStatus, Center } from '@/types';
 import { ModalPortal } from '@/components/modal-portal';
+import { normalizeStudentStatus } from '@/src/utils/statusUtils';
 
 export interface EditStudentModalProps {
   student: Student;
@@ -24,7 +25,7 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({ student, cen
     phone: student.phone || '',
     parentName: student.parentName || '',
     parentPhone: student.parentPhone || '',
-    status: student.status || StudentStatus.ACTIVE,
+    status: normalizeStudentStatus(student.status) || StudentStatus.ACTIVE,
     branch: student.branch || '',
     // Note: 'class' field is intentionally excluded - use "Chuyển lớp" feature instead
     registeredSessions: student.registeredSessions || 0,
@@ -55,8 +56,15 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({ student, cen
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Auto-set status = 'Nợ phí' nếu số buổi còn lại < 0
-    const finalStatus = formData.remainingSessions < 0 ? StudentStatus.DEBT : formData.status;
+
+    // If user explicitly chooses "Nghỉ học", keep it even when remainingSessions < 0.
+    // Otherwise, keep the existing auto-set to "Nợ phí" for negative remaining.
+    const finalStatus =
+      formData.status === StudentStatus.DROPPED
+        ? StudentStatus.DROPPED
+        : formData.remainingSessions < 0
+          ? StudentStatus.DEBT
+          : formData.status;
     onSubmit({ ...formData, status: finalStatus });
   };
 
@@ -145,7 +153,12 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({ student, cen
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               >
                 {Object.values(StudentStatus).map(status => (
-                  <option key={status} value={status}>{status}</option>
+                  <option
+                    key={status}
+                    value={status}
+                  >
+                    {status}
+                  </option>
                 ))}
               </select>
             </div>

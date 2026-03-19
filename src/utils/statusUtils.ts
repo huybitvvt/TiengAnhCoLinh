@@ -30,10 +30,17 @@ const STUDENT_STATUS_MAP: Record<string, StudentStatus> = {
  */
 export const normalizeStudentStatus = (status: string | StudentStatus | undefined): StudentStatus => {
   if (!status) return StudentStatus.ACTIVE;
-  if (Object.values(StudentStatus).includes(status as StudentStatus)) {
-    return status as StudentStatus;
+  const raw = String(status);
+  const normalized = raw
+    .replace(/\u00A0/g, ' ') // non-breaking space
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (Object.values(StudentStatus).includes(normalized as StudentStatus)) {
+    return normalized as StudentStatus;
   }
-  return STUDENT_STATUS_MAP[status] || StudentStatus.ACTIVE;
+  // First try Vietnamese/enum exact match after normalization, then fall back to lower-case keys.
+  return STUDENT_STATUS_MAP[normalized] || STUDENT_STATUS_MAP[normalized.toLowerCase()] || StudentStatus.ACTIVE;
 };
 
 /**
