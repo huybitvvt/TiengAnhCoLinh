@@ -70,6 +70,42 @@ interface ClassProgress {
 // Absent statuses that count as missed sessions
 const ABSENT_STATUSES = ['Vắng', 'Vắng không phép', 'Nghỉ'];
 
+const STUDENT_STATUS = {
+  ACTIVE: 'Đang học',
+  DEBT: 'Nợ phí',
+  CONTRACT_DEBT: 'Nợ hợp đồng',
+  RESERVED: 'Bảo lưu',
+  DROPPED: 'Nghỉ học',
+  TRIAL: 'Học thử',
+  EXPIRED_FEE: 'Đã học hết phí'
+} as const;
+
+function computeDebtStatus(remainingSessions: number) {
+  // remainingSessions < 0 => debt
+  if (remainingSessions < 0) {
+    return {
+      status: STUDENT_STATUS.DEBT,
+      debtSessions: Math.abs(remainingSessions),
+      debtStartDate: new Date().toISOString()
+    };
+  }
+
+  if (remainingSessions === 0) {
+    return {
+      status: STUDENT_STATUS.EXPIRED_FEE,
+      debtSessions: 0,
+      debtStartDate: null
+    };
+  }
+
+  // remainingSessions > 0
+  return {
+    status: STUDENT_STATUS.ACTIVE,
+    debtSessions: 0,
+    debtStartDate: null
+  };
+}
+
 /**
  * Helper: Get or initialize classProgress for a student
  */
@@ -247,6 +283,23 @@ export const onStudentAttendanceCreate = functions
       } else {
         console.log(`[onStudentAttendanceCreate] Session attendance - Updated student ${studentId}: attended=${newAttended}, remaining=${remaining}`);
       }
+
+      // Update student fee/debt status based on remaining sessions.
+      // This makes student status update automatically when attendance is edited.
+      const currentStatus = studentData.status;
+      const skipAutoStatuses = [
+        STUDENT_STATUS.DROPPED,
+        STUDENT_STATUS.RESERVED,
+        STUDENT_STATUS.TRIAL,
+        STUDENT_STATUS.CONTRACT_DEBT,
+      ];
+
+      if (registeredSessions > 0 && !skipAutoStatuses.includes(currentStatus)) {
+        const debtUpdate = computeDebtStatus(remaining);
+        updateData.status = debtUpdate.status;
+        updateData.debtSessions = debtUpdate.debtSessions;
+        updateData.debtStartDate = debtUpdate.debtStartDate;
+      }
     }
     // Note: For absent status, we don't update legacy fields - only classProgress
 
@@ -366,8 +419,22 @@ export const onStudentAttendanceUpdate = functions
     updateData.remainingSessions = remaining;
     updateData.expectedEndDate = expectedEndDate;
 
-    // BỎ logic auto set status "Nợ phí" nếu trạng thái hiện tại không phải "Đang học"
-    // Chỉ cập nhật status nếu thực sự muốn override từ phía client/admin
+    // Update student fee/debt status based on remaining sessions.
+    // This runs on attendance status edit (present/absent change).
+    const currentStatus = studentData.status;
+    const skipAutoStatuses = [
+      STUDENT_STATUS.DROPPED,
+      STUDENT_STATUS.RESERVED,
+      STUDENT_STATUS.TRIAL,
+      STUDENT_STATUS.CONTRACT_DEBT,
+    ];
+
+    if (registeredSessions > 0 && !skipAutoStatuses.includes(currentStatus)) {
+      const debtUpdate = computeDebtStatus(remaining);
+      updateData.status = debtUpdate.status;
+      updateData.debtSessions = debtUpdate.debtSessions;
+      updateData.debtStartDate = debtUpdate.debtStartDate;
+    }
 
     // Track makeup separately for reporting
     if (!isSessionAttendance) {
