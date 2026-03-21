@@ -229,6 +229,20 @@ export const Attendance: React.FC = () => {
     } : undefined
   });
 
+  /** Cùng một ngày có >1 document classSessions → dropdown trùng chữ; thêm hậu tố Buổi N để phân biệt */
+  const sessionDatesWithDuplicates = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const s of allSessions) {
+      if (s.sessionNumber <= 0 || !s.date) continue;
+      counts.set(s.date, (counts.get(s.date) || 0) + 1);
+    }
+    const dups = new Set<string>();
+    counts.forEach((n, date) => {
+      if (n > 1) dups.add(date);
+    });
+    return dups;
+  }, [allSessions]);
+
   // Persist key filters to URL so refresh doesn't lose context
   useEffect(() => {
     // Use functional update so we don't depend on the `searchParams` object in deps
@@ -1500,8 +1514,12 @@ export const Attendance: React.FC = () => {
                               const teacherName = selectedSession.teacherName || selectedClass?.teacher || '';
                               const dateStr = new Date(selectedSession.date).toLocaleDateString('vi-VN');
                               const timeStr = selectedSession.time || '';
+                              const dup =
+                                sessionDatesWithDuplicates.has(selectedSession.date)
+                                  ? ` · Buổi ${selectedSession.sessionNumber}`
+                                  : '';
                               return teacherName 
-                                ? `GV: ${teacherName} - ${selectedSession.dayOfWeek} - ${dateStr}${timeStr ? ` (${timeStr})` : ''}`
+                                ? `GV: ${teacherName} - ${selectedSession.dayOfWeek} - ${dateStr}${timeStr ? ` (${timeStr})` : ''}${dup}`
                                 : `Buổi ${selectedSession.sessionNumber} - ${dateStr} (${selectedSession.dayOfWeek})`;
                             })()
                           : '-- Chọn buổi học --'
@@ -1573,8 +1591,10 @@ export const Attendance: React.FC = () => {
                                   const teacherName = s.teacherName || selectedClass?.teacher || '';
                                   const dateStr = new Date(s.date).toLocaleDateString('vi-VN');
                                   const timeStr = s.time || '';
+                                  const dup =
+                                    sessionDatesWithDuplicates.has(s.date) ? ` · Buổi ${s.sessionNumber}` : '';
                                   return teacherName 
-                                    ? `GV: ${teacherName} - ${s.dayOfWeek} - ${dateStr}${timeStr ? ` (${timeStr})` : ''}`
+                                    ? `GV: ${teacherName} - ${s.dayOfWeek} - ${dateStr}${timeStr ? ` (${timeStr})` : ''}${dup}`
                                     : `Buổi ${s.sessionNumber} - ${dateStr} (${s.dayOfWeek})`;
                                 })()}
                               </span>
