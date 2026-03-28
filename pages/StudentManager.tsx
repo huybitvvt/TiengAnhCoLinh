@@ -32,6 +32,7 @@ import {
   RemoveClassModal,
   LegacyImportModal,
 } from '../src/features/students/components';
+import { SearchableClassDropdown } from '../src/features/attendance';
 import { ModalPortal } from '@/components/modal-portal';
 
 // Constants for table column count
@@ -547,17 +548,14 @@ export const StudentManager: React.FC<StudentManagerProps> = ({
             ))}
           </select>
 
-          <select
-            className="pl-2 pr-8 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-sm min-w-[140px]"
-            value={filterClass}
-            onChange={(e) => setFilterClass(e.target.value)}
-          >
-            <option value="ALL">Tất cả lớp</option>
-            <option value="NO_CLASS">Chưa có lớp</option>
-            {classes.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+          <SearchableClassDropdown
+            classes={classes}
+            filterValue={filterClass}
+            onFilterChange={setFilterClass}
+            hideBranchFilter
+            placeholder="Gõ để tìm lớp..."
+            inputClassName="min-w-[140px] max-w-[280px]"
+          />
 
           <select
             className="pl-2 pr-8 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white text-sm min-w-[120px]"

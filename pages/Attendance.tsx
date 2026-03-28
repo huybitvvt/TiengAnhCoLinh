@@ -1936,7 +1936,7 @@ export const Attendance: React.FC = () => {
 
           {/* Bulk Actions */}
           <div className="p-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm font-medium text-gray-600">Điểm danh nhanh:</span>
               <button
                 onClick={() => handleBulkStatus(AttendanceStatus.ON_TIME)}
@@ -1949,6 +1949,12 @@ export const Attendance: React.FC = () => {
                 className="px-3 py-1 text-xs font-medium rounded bg-red-100 text-red-700 hover:bg-red-200"
               >
                 Tất cả vắng
+              </button>
+              <button
+                onClick={() => handleBulkStatus(AttendanceStatus.RESERVED)}
+                className="px-3 py-1 text-xs font-medium rounded bg-orange-100 text-orange-700 hover:bg-orange-200"
+              >
+                Tất cả bảo lưu
               </button>
             </div>
             <button
