@@ -58,6 +58,7 @@ export const StudentDetail: React.FC = () => {
   const [processingManual, setProcessingManual] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
   const [viewingClassId, setViewingClassId] = useState<string | null>(null);
+  const [viewingClassName, setViewingClassName] = useState<string>('');
   const [classAttendanceRecords, setClassAttendanceRecords] = useState<any[]>([]);
   const [loadingClassAttendance, setLoadingClassAttendance] = useState(false);
   
@@ -199,6 +200,48 @@ export const StudentDetail: React.FC = () => {
   }, [student]);
   
   const showSessionWarning = remainingSessions > 0 && remainingSessions <= 6;
+  const studentHistoryClasses = useMemo(() => {
+    if (!student) return [];
+
+    const classMap = new Map(classes.map(c => [c.id, c]));
+    const classIds = new Set<string>();
+
+    (student.classIds || []).forEach((cid: string) => cid && classIds.add(cid));
+    if (student.classId) classIds.add(student.classId);
+    Object.keys(student.classProgress || {}).forEach(cid => cid && classIds.add(cid));
+    (enrollments || []).forEach((e: any) => e?.classId && classIds.add(e.classId));
+
+    return Array.from(classIds).map((classId) => {
+      const cls = classMap.get(classId);
+      const progress = (student.classProgress as any)?.[classId];
+      const enrollmentName = (enrollments || []).find((e: any) => e.classId === classId)?.className;
+      return {
+        id: classId,
+        name: cls?.name || enrollmentName || (classId === student.classId ? (student.class || student.className || 'Lớp hiện tại') : `Lớp cũ (${classId.slice(0, 6)})`),
+        curriculum: cls?.curriculum || '--',
+        startDate: cls?.startDate,
+        endDate: cls?.endDate,
+        registered: progress?.registeredSessions,
+        attended: progress?.attendedSessions,
+      };
+    });
+  }, [student, classes, enrollments]);
+  const classProgressRows = useMemo(() => {
+    if (!student?.classProgress) return [];
+    return Object.entries(student.classProgress).map(([classId, progress]: [string, any]) => {
+      const cls = classes.find(c => c.id === classId);
+      const registered = progress?.registeredSessions || 0;
+      const attended = progress?.attendedSessions || 0;
+      return {
+        classId,
+        className: cls?.name || (classId === student.classId ? student.class : `Lớp cũ (${classId.slice(0, 6)})`),
+        registered,
+        attended,
+        remaining: registered - attended,
+        isCurrent: classId === student.classId,
+      };
+    });
+  }, [student, classes]);
   
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -663,18 +706,7 @@ export const StudentDetail: React.FC = () => {
                      </thead>
                      <tbody className="divide-y divide-gray-100">
                         {(() => {
-                           // Get all classes this student is enrolled in
-                           const studentClassIds = student.classIds || (student.classId ? [student.classId] : []);
-                           const studentClassName = student.class || student.className;
-                           
-                           // Find matching classes
-                           const enrolledClasses = classes.filter(cls => 
-                              studentClassIds.includes(cls.id) || 
-                              cls.name === studentClassName ||
-                              cls.id === student.classId
-                           );
-
-                           if (enrolledClasses.length === 0) {
+                           if (studentHistoryClasses.length === 0) {
                               return (
                                  <tr>
                                     <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
@@ -684,7 +716,7 @@ export const StudentDetail: React.FC = () => {
                               );
                            }
 
-                           return enrolledClasses.map(cls => {
+                           return studentHistoryClasses.map(cls => {
                               const getStatusBadge = (status: string) => {
                                  const s = status?.toLowerCase() || '';
                                  if (s.includes('đang học') || s === 'active') return { bg: 'bg-green-100', text: 'text-green-700', label: 'Đang học' };
@@ -704,7 +736,11 @@ export const StudentDetail: React.FC = () => {
                                        {' - '}
                                        {cls.endDate ? new Date(cls.endDate).toLocaleDateString('vi-VN') : 'Nay'}
                                     </td>
-                                    <td className="px-4 py-3">--</td>
+                                    <td className="px-4 py-3">
+                                      {typeof cls.attended === 'number' && typeof cls.registered === 'number'
+                                        ? `${cls.attended}/${cls.registered}`
+                                        : '--'}
+                                    </td>
                                     <td className="px-4 py-3 text-center">
                                        <span className={`${badge.bg} ${badge.text} px-2 py-1 rounded text-xs font-bold`}>
                                           {badge.label}
@@ -714,6 +750,7 @@ export const StudentDetail: React.FC = () => {
                                        <button
                                           onClick={async () => {
                                              setViewingClassId(cls.id);
+                                             setViewingClassName(cls.name || '');
                                              setLoadingClassAttendance(true);
                                              try {
                                                 const attendanceQuery = query(
@@ -761,12 +798,13 @@ export const StudentDetail: React.FC = () => {
                               <div>
                                  <h3 className="text-lg font-bold text-gray-800">Các buổi đã học</h3>
                                  <p className="text-sm text-gray-500 mt-1">
-                                    {classes.find(c => c.id === viewingClassId)?.name || 'N/A'}
+                                    {viewingClassName || classes.find(c => c.id === viewingClassId)?.name || 'N/A'}
                                  </p>
                               </div>
                               <button
                                  onClick={() => {
                                     setViewingClassId(null);
+                                    setViewingClassName('');
                                     setClassAttendanceRecords([]);
                                  }}
                                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -861,6 +899,7 @@ export const StudentDetail: React.FC = () => {
                                  <button
                                     onClick={() => {
                                        setViewingClassId(null);
+                                       setViewingClassName('');
                                        setClassAttendanceRecords([]);
                                     }}
                                     className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
@@ -1018,6 +1057,46 @@ export const StudentDetail: React.FC = () => {
                            </p>
                         </div>
                      </div>
+
+                     {/* Class progress history (includes old classes) */}
+                     {classProgressRows.length > 0 && (
+                        <div className="bg-white border border-gray-200 rounded-xl p-4">
+                           <h4 className="font-semibold text-gray-800 mb-3">Tiến độ theo lớp (gồm lớp cũ)</h4>
+                           <div className="overflow-x-auto">
+                              <table className="w-full text-sm">
+                                 <thead className="text-xs text-gray-500 uppercase border-b">
+                                    <tr>
+                                       <th className="py-2 text-left">Lớp</th>
+                                       <th className="py-2 text-center">Đăng ký</th>
+                                       <th className="py-2 text-center">Đã điểm danh</th>
+                                       <th className="py-2 text-center">Còn lại</th>
+                                    </tr>
+                                 </thead>
+                                 <tbody>
+                                    {classProgressRows.map(row => (
+                                       <tr key={row.classId} className="border-b last:border-b-0">
+                                          <td className="py-2">
+                                             <div className="flex items-center gap-2">
+                                                <span className="font-medium text-gray-800">{row.className || '--'}</span>
+                                                {row.isCurrent && (
+                                                   <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-700">
+                                                      Lớp hiện tại
+                                                   </span>
+                                                )}
+                                             </div>
+                                          </td>
+                                          <td className="py-2 text-center text-blue-700 font-semibold">{row.registered}</td>
+                                          <td className="py-2 text-center text-green-700 font-semibold">{row.attended}</td>
+                                          <td className={`py-2 text-center font-semibold ${row.remaining < 0 ? 'text-red-600' : 'text-gray-700'}`}>
+                                             {row.remaining}
+                                          </td>
+                                       </tr>
+                                    ))}
+                                 </tbody>
+                              </table>
+                           </div>
+                        </div>
+                     )}
 
                      {/* Enrollment History */}
                      <div>

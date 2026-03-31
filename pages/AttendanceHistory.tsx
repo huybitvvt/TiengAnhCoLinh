@@ -872,6 +872,48 @@ export const AttendanceHistory: React.FC = () => {
               Bộ lọc {hasActiveFilters && `(${[filterClass, filterTeacher, filterStudent, filterStatus, filterFromDate, filterToDate].filter(Boolean).length})`}
             </button>
           </div>
+
+          {/* Quick filters: class + single date */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Lọc nhanh theo lớp</label>
+              <select
+                value={filterClass}
+                onChange={(e) => setFilterClass(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">Tất cả lớp</option>
+                {classes.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Lọc nhanh theo ngày</label>
+              <input
+                type="date"
+                value={filterFromDate && filterToDate && filterFromDate === filterToDate ? filterFromDate : ''}
+                onChange={(e) => {
+                  const d = e.target.value;
+                  setFilterFromDate(d);
+                  setFilterToDate(d);
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={() => {
+                  setFilterClass('');
+                  setFilterFromDate('');
+                  setFilterToDate('');
+                }}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
+              >
+                Xóa lọc nhanh
+              </button>
+            </div>
+          </div>
           
           {/* Filter Panel */}
           {showFilters && (

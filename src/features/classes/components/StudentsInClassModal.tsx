@@ -15,6 +15,7 @@ import { TransferClassModal } from '@/src/features/students/components/TransferC
 import { useClasses } from '@/src/hooks/useClasses';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
+import { getStudentSessionData } from '@/src/utils/student-session-utils';
 
 export interface StudentsInClassModalProps {
   classData: ClassModel;
@@ -335,10 +336,7 @@ export const StudentsInClassModal: React.FC<StudentsInClassModalProps> = ({ clas
             ) : (
               <div className="space-y-2">
                 {filteredStudentsInClass.map((student) => {
-                  const registered = student.registeredSessions || 0;
-                  const attended = student.attendedSessions || 0;
-                  const legacyAttended = student.legacyAttendedSessions || 0;
-                  const remaining = Math.max(0, registered - attended - legacyAttended);
+                  const { registered, totalAttended, remaining } = getStudentSessionData(student as Student);
                   return (
                   <div
                     key={student.id}
@@ -362,7 +360,7 @@ export const StudentsInClassModal: React.FC<StudentsInClassModalProps> = ({ clas
                         <div className="flex items-center gap-2 text-xs">
                           <span className="text-blue-600" title="Đăng ký">{registered} ĐK</span>
                           <span className="text-gray-400">/</span>
-                          <span className="text-green-600" title="Đã học">{attended + legacyAttended} ĐH</span>
+                          <span className="text-green-600" title="Đã học">{totalAttended} ĐH</span>
                           <span className="text-gray-400">/</span>
                           <span className={`font-medium ${remaining <= 3 ? 'text-red-600' : 'text-orange-600'}`} title="Còn lại">
                             {remaining} CL

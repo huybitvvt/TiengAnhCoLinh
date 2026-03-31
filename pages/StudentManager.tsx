@@ -772,18 +772,16 @@ export const StudentManager: React.FC<StudentManagerProps> = ({
                     {/* Tổng số buổi của lớp hiện tại (ưu tiên classProgress) */}
                     <td className="px-4 py-3 text-center">
                        <span className="font-semibold text-emerald-600">
-                         {getStudentSessionData(student).registered}
+                         {getStudentSessionData(student).registeredAll}
                        </span>
                     </td>
                     {/* Buổi đã học: nếu có classProgress thì chỉ tính theo lớp hiện tại */}
                     <td className="px-4 py-3 text-center">
                        {(() => {
-                         const { attended, legacyAttended } = getStudentSessionData(student);
-                         const hasCurrentClassProgress = !!(student.classId && student.classProgress?.[student.classId]);
-                         const totalLearned = hasCurrentClassProgress ? attended : attended + legacyAttended;
+                         const { totalAttended } = getStudentSessionData(student);
                          return (
                            <span className="font-semibold text-purple-600">
-                             {totalLearned}
+                             {totalAttended}
                            </span>
                          );
                        })()}
@@ -791,13 +789,14 @@ export const StudentManager: React.FC<StudentManagerProps> = ({
                     {/* Đã điểm danh (hệ thống mới) */}
                     <td className="px-4 py-3 text-center">
                        <span className="font-semibold text-green-600">
-                         {getStudentSessionData(student).attended}
+                         {getStudentSessionData(student).attendedAll}
                        </span>
                     </td>
                     {/* Còn lại theo logic lớp hiện tại */}
                     <td className="px-4 py-3 text-center">
                        {(() => {
-                         const { remaining } = getStudentSessionData(student);
+                         const { registeredAll, attendedAll } = getStudentSessionData(student);
+                         const remaining = registeredAll - attendedAll;
                          return (
                            <span className={`font-bold ${remaining < 0 ? 'text-red-600' : remaining <= 5 ? 'text-orange-500' : 'text-gray-700'}`}>
                              {remaining}
