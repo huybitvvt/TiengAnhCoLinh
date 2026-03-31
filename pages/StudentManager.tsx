@@ -769,17 +769,18 @@ export const StudentManager: React.FC<StudentManagerProps> = ({
                          {getStudentSessionData(student).legacyAttended}
                        </span>
                     </td>
-                    {/* Tổng số buổi đăng ký do hệ thống tính (bao gồm hợp đồng cũ + mới) */}
+                    {/* Tổng số buổi của lớp hiện tại (ưu tiên classProgress) */}
                     <td className="px-4 py-3 text-center">
                        <span className="font-semibold text-emerald-600">
-                         {student.registeredSessions || 0}
+                         {getStudentSessionData(student).registered}
                        </span>
                     </td>
-                    {/* Buổi đã học = Đã điểm danh (mới) + Đã học (cũ) */}
+                    {/* Buổi đã học: nếu có classProgress thì chỉ tính theo lớp hiện tại */}
                     <td className="px-4 py-3 text-center">
                        {(() => {
                          const { attended, legacyAttended } = getStudentSessionData(student);
-                         const totalLearned = attended + legacyAttended;
+                         const hasCurrentClassProgress = !!(student.classId && student.classProgress?.[student.classId]);
+                         const totalLearned = hasCurrentClassProgress ? attended : attended + legacyAttended;
                          return (
                            <span className="font-semibold text-purple-600">
                              {totalLearned}
@@ -793,13 +794,10 @@ export const StudentManager: React.FC<StudentManagerProps> = ({
                          {getStudentSessionData(student).attended}
                        </span>
                     </td>
-                    {/* Còn lại = Tổng số buổi - Buổi đã học */}
+                    {/* Còn lại theo logic lớp hiện tại */}
                     <td className="px-4 py-3 text-center">
                        {(() => {
-                         const totalSessions = student.registeredSessions || 0;
-                         const { attended, legacyAttended } = getStudentSessionData(student);
-                         const learned = attended + legacyAttended;
-                         const remaining = totalSessions - learned;
+                         const { remaining } = getStudentSessionData(student);
                          return (
                            <span className={`font-bold ${remaining < 0 ? 'text-red-600' : remaining <= 5 ? 'text-orange-500' : 'text-gray-700'}`}>
                              {remaining}

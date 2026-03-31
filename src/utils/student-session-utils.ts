@@ -44,7 +44,8 @@ export function getStudentSessionData(student: Student | null): StudentSessionDa
       registered,
       attended,
       legacyAttended,
-      remaining: registered - attended - legacyAttended
+      // classProgress đã là dữ liệu theo từng lớp; không trừ "đã học cũ" toàn cục vào lớp hiện tại
+      remaining: registered - attended
     };
   }
 
