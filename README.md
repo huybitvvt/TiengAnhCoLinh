@@ -104,12 +104,20 @@ Mở URL Vite in ra trên terminal, thường là:
 http://127.0.0.1:5173/
 ```
 
-Tài khoản demo khi dùng emulator:
+## Tài khoản test
+
+Tài khoản đăng nhập demo khi chạy bằng Firebase emulator:
 
 ```text
 Email: admin@brisky.edu.vn
 Password: 123456
+Quyền: Quản trị viên
 ```
+
+Lưu ý:
+
+- Cần chạy `npm run emulators` và `npm run seed:emulator` trước khi đăng nhập.
+- Các email nhân sự demo như `lan@brisky.edu.vn`, `hung@brisky.edu.vn`, `huong@brisky.edu.vn` chỉ là hồ sơ nhân sự, chưa phải tài khoản đăng nhập Firebase Auth.
 
 ## Lệnh phát triển
 
