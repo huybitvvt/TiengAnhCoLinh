@@ -26,7 +26,15 @@ Auth đăng nhập hiện vẫn dùng Firebase Auth. Khi chạy local với `.en
 
 ## Cấu hình Supabase
 
-Chạy các file SQL trong Supabase SQL Editor theo đúng thứ tự:
+Repo đã commit sẵn `.env.local` trỏ tới Supabase project hiện tại:
+
+```text
+https://yhdluaslmontbqopftbd.supabase.co/rest/v1/
+```
+
+Vì vậy người clone repo về để test bằng cấu hình có sẵn **không cần chạy lại file SQL Supabase**. Chỉ cần cài dependency, chạy Firebase emulator để đăng nhập demo, rồi chạy Vite.
+
+Chỉ chạy các file SQL bên dưới khi bạn tạo Supabase project mới, đổi sang database khác, hoặc cần tạo lại schema từ đầu:
 
 ```sql
 -- 1. Tạo bảng, index, view, trigger và policy authenticated
@@ -50,11 +58,14 @@ Các view hỗ trợ:
 - `schedule_view`
 - `attendance_summary_view`
 
-Lưu ý: file `002_training_anon_policies.sql` dùng để app frontend gọi Supabase trực tiếp bằng publishable/anon key trong giai đoạn dev. Khi đưa production nên chuyển sang Supabase Auth hoặc backend API có service role được bảo vệ.
+Lưu ý:
+
+- Với Supabase project đã cấu hình trong `.env.local`, các bảng/policy này đã được tạo sẵn.
+- File `002_training_anon_policies.sql` dùng để app frontend gọi Supabase trực tiếp bằng publishable/anon key trong giai đoạn dev. Khi đưa production nên chuyển sang Supabase Auth hoặc backend API có service role được bảo vệ.
 
 ## Cấu hình môi trường
 
-Repo có `.env.example` để tạo cấu hình mới. Theo yêu cầu hiện tại, `.env.local` cũng được commit để clone repo là có sẵn cấu hình demo:
+Repo có `.env.example` để tạo cấu hình mới. Theo yêu cầu hiện tại, `.env.local` cũng được commit để clone repo là có sẵn cấu hình demo và kết nối được ngay tới Supabase hiện tại:
 
 ```env
 VITE_FIREBASE_API_KEY=demo-api-key
@@ -71,6 +82,8 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_76Yxjdx3320lz9GzZQWKGw_V767ntZp
 ```
 
 `VITE_DATA_BACKEND=supabase` làm cho các module lớp học, học sinh, thời khóa biểu và điểm danh dùng Supabase thay vì Firestore.
+
+Nếu giữ nguyên `.env.local` trong repo thì không cần tạo Supabase mới và không cần chạy lại `supabase/001_training_attendance_schema.sql` hoặc `supabase/002_training_anon_policies.sql`.
 
 ## Chạy local
 
