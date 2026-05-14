@@ -1,1 +1,6 @@
 /* Tailwind is loaded from index.html; keep this file to satisfy the stylesheet link in dev/build. */
+
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
