@@ -38,8 +38,8 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     facingMode: facingMode,
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
+                    width: { ideal: 640 },
+                    height: { ideal: 480 }
                 },
                 audio: false
             });
@@ -100,17 +100,25 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
         const video = videoRef.current;
         const canvas = canvasRef.current;
 
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        const maxWidth = 640;
+        const maxHeight = 480;
+        const scale = Math.min(
+            1,
+            maxWidth / (video.videoWidth || maxWidth),
+            maxHeight / (video.videoHeight || maxHeight)
+        );
+
+        canvas.width = Math.round((video.videoWidth || maxWidth) * scale);
+        canvas.height = Math.round((video.videoHeight || maxHeight) * scale);
 
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
         // Draw video frame to canvas
-        ctx.drawImage(video, 0, 0);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
         // Get data URL
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
         setCapturedImage(dataUrl);
 
         // Stop camera to save resources

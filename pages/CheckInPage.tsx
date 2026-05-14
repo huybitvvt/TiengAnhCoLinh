@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useCheckIn, useCheckInHistory } from '../src/hooks/useCheckIn';
 import { CameraCapture } from '../components/CameraCapture';
-import { uploadCheckInPhoto, dataURLtoBlob } from '../src/services/photoUploadService';
+import { uploadCheckInPhotoFromDataUrl } from '../src/services/photoUploadService';
 import { useAuth } from '../src/hooks/useAuth';
 import { ModalPortal } from '@/components/modal-portal';
 
@@ -84,9 +84,9 @@ export const CheckInPage: React.FC = () => {
         try {
             const staffId = staffData?.id || user?.uid || '';
 
-            // Convert to blob and upload
-            const blob = dataURLtoBlob(photoDataUrl);
-            const photoUrl = await uploadCheckInPhoto(staffId, blob, 'checkin');
+            // Compress and upload the photo. Local emulator mode stores a small
+            // data URL fallback so check-in does not wait on Firebase Storage.
+            const photoUrl = await uploadCheckInPhotoFromDataUrl(staffId, photoDataUrl, 'checkin');
 
             // Now perform check-in with photo URL
             const success = await checkIn(wifiName || undefined, photoUrl);
@@ -95,8 +95,8 @@ export const CheckInPage: React.FC = () => {
                 setWifiName('');
             }
         } catch (err: any) {
-            console.error('Error uploading photo:', err);
-            setUploadError(err.message || 'Không thể upload ảnh. Vui lòng thử lại.');
+            console.error('Error saving check-in photo:', err);
+            setUploadError(err.message || 'Không thể lưu ảnh chấm công. Vui lòng thử lại.');
         } finally {
             setIsUploading(false);
         }
@@ -215,7 +215,7 @@ export const CheckInPage: React.FC = () => {
                                             ) : (
                                                 <Camera size={24} />
                                             )}
-                                            {isUploading ? 'Đang tải ảnh...' : 'Chụp ảnh & Chấm công'}
+                                            {isUploading ? 'Đang lưu chấm công...' : 'Chụp ảnh & Chấm công'}
                                         </button>
                                     </div>
                                 </div>
