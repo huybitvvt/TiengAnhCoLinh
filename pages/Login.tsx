@@ -80,7 +80,7 @@ export const Login: React.FC = () => {
               <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border-2 border-white/20">
                 <img 
                   src="/logo.jpg" 
-                  alt="Brisky Logo" 
+                  alt="Tiếng Anh Cô Thảo Linh Logo" 
                   className="w-48 h-48 object-contain drop-shadow-2xl"
                 />
               </div>
@@ -88,7 +88,7 @@ export const Login: React.FC = () => {
             
             <div className="space-y-4">
               <h1 className="text-6xl font-bold text-white leading-tight" style={{ fontFamily: "'Playfair Display', serif" }}>
-                Brisky<br />English
+                Tiếng Anh<br />Cô Thảo Linh
               </h1>
               <div className="w-24 h-1 bg-white/80"></div>
               <p className="text-xl text-white/90 font-light max-w-md leading-relaxed">
@@ -122,11 +122,11 @@ export const Login: React.FC = () => {
             <div className="lg:hidden text-center mb-12">
               <img 
                 src="/logo.jpg" 
-                alt="Brisky Logo" 
+                alt="Tiếng Anh Cô Thảo Linh Logo" 
                 className="w-32 h-32 mx-auto object-contain mb-4"
               />
               <h1 className="text-4xl font-bold text-[#1A1F3A]" style={{ fontFamily: "'Playfair Display', serif" }}>
-                Brisky English
+                Tiếng Anh Cô Thảo Linh
               </h1>
             </div>
 
@@ -267,7 +267,7 @@ export const Login: React.FC = () => {
             {/* Footer */}
             <div className="pt-8 text-center">
               <p className="text-sm text-gray-500">
-                © 2025 Brisky English
+                © 2025 Tiếng Anh Cô Thảo Linh
               </p>
             </div>
           </div>
