@@ -14,6 +14,8 @@ import { db } from '../src/config/firebase';
 import { usePermissions } from '../src/hooks/usePermissions';
 import { useAuth } from '../src/hooks/useAuth';
 import { formatCurrency } from '../src/utils/currencyUtils';
+import { ClassService } from '../src/services/classService';
+import { StudentService } from '../src/services/studentService';
 import {
   DashboardStats,
   RevenueChart,
@@ -175,14 +177,13 @@ export const DashboardCSKH: React.FC = () => {
           });
         };
 
-        // Fetch students
-        const studentsSnap = await getDocs(collection(db, 'students'));
-        const allStudents = studentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Fetch training data through services so it respects VITE_DATA_BACKEND.
+        const [allStudents, allClasses] = await Promise.all([
+          StudentService.getStudents() as Promise<any[]>,
+          ClassService.getClasses() as Promise<any[]>,
+        ]);
         const students = filterByBranch(allStudents);
 
-        // Fetch classes
-        const classesSnap = await getDocs(collection(db, 'classes'));
-        const allClasses = classesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         const classes = filterByBranch(allClasses);
 
         // Fetch staff

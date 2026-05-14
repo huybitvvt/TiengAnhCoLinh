@@ -25,11 +25,14 @@ import {
   Cake,
   GraduationCap,
 } from 'lucide-react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../src/config/firebase';
 import { usePermissions } from '../src/hooks/usePermissions';
 import { useAuth } from '../src/hooks/useAuth';
 import { formatCurrency } from '../src/utils/currencyUtils';
+import { ClassService } from '../src/services/classService';
+import { StudentService } from '../src/services/studentService';
+import { getAllStudentAttendanceRecords } from '../src/services/attendanceService';
 
 interface GVStats {
   // My stats
@@ -80,21 +83,28 @@ export const DashboardGV: React.FC = () => {
         const currentYear = now.getFullYear();
         const thisMonth = currentMonth + 1;
 
-        // Fetch classes
-        const classesSnap = await getDocs(collection(db, 'classes'));
-        const classes = classesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-        // Fetch students
-        const studentsSnap = await getDocs(collection(db, 'students'));
-        const students = studentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Fetch training data through services so it respects VITE_DATA_BACKEND.
+        const [classes, students] = await Promise.all([
+          ClassService.getClasses() as Promise<any[]>,
+          StudentService.getStudents() as Promise<any[]>,
+        ]);
 
         // Fetch work sessions
         const workSessionsSnap = await getDocs(collection(db, 'workSessions'));
         const workSessions = workSessionsSnap.docs.map(d => d.data());
 
-        // Fetch attendance
-        const attendanceSnap = await getDocs(collection(db, 'studentAttendance'));
-        const attendanceRecords = attendanceSnap.docs.map(d => d.data());
+        // Fetch attendance through service so it respects VITE_DATA_BACKEND.
+        const attendanceRecords = await getAllStudentAttendanceRecords();
+
+        const studentBelongsToClass = (student: any, classInfo: any) =>
+          student.classId === classInfo.id ||
+          student.classIds?.includes(classInfo.id) ||
+          student.class === classInfo.name ||
+          student.className === classInfo.name ||
+          student.currentClassName === classInfo.name;
+
+        const getClassStudents = (classInfo: any) =>
+          students.filter((student: any) => studentBelongsToClass(student, classInfo));
 
         // My classes (where I'm teacher or assistant)
         const myClasses = classes
@@ -102,7 +112,7 @@ export const DashboardGV: React.FC = () => {
           .map((c: any) => ({
             id: c.id,
             name: c.name || '',
-            studentCount: c.currentStudents || c.studentIds?.length || 0,
+            studentCount: getClassStudents(c).length,
             scheduleDay: c.scheduleDay || c.schedule?.day || '',
             scheduleTime: c.scheduleTime || c.schedule?.time || '',
           }));
@@ -112,9 +122,7 @@ export const DashboardGV: React.FC = () => {
         classes
           .filter((c: any) => c.teacherId === currentStaffId || c.assistantId === currentStaffId)
           .forEach((c: any) => {
-            if (c.studentIds) {
-              myStudentIds.push(...c.studentIds);
-            }
+            myStudentIds.push(...getClassStudents(c).map((student: any) => student.id));
           });
         const uniqueMyStudentIds = [...new Set(myStudentIds)];
 

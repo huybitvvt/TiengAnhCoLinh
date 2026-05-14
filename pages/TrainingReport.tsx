@@ -9,6 +9,9 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../src/config/firebase';
 import { formatCurrency } from '../src/utils/currencyUtils';
 import { getStudentSessionData } from '../src/utils/student-session-utils';
+import { ClassService } from '../src/services/classService';
+import { StudentService } from '../src/services/studentService';
+import { getAllStudentAttendanceRecords, getAttendanceRecords } from '../src/services/attendanceService';
 
 interface TrainingSummary {
   totalClasses: number;
@@ -66,18 +69,16 @@ export const TrainingReport: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // Fetch all collections
-      const [classesSnap, studentsSnap, attendanceSnap, tutoringSnap, contractsSnap] = await Promise.all([
-        getDocs(collection(db, 'classes')),
-        getDocs(collection(db, 'students')),
-        getDocs(collection(db, 'attendance')),
+      // Fetch training data through services so it respects VITE_DATA_BACKEND.
+      const [classes, students, attendance, studentAttendanceRows, tutoringSnap, contractsSnap] = await Promise.all([
+        ClassService.getClasses() as Promise<any[]>,
+        StudentService.getStudents() as Promise<any[]>,
+        getAttendanceRecords() as Promise<any[]>,
+        getAllStudentAttendanceRecords() as Promise<any[]>,
         getDocs(collection(db, 'tutoring')),
         getDocs(collection(db, 'contracts')),
       ]);
 
-      const classes = classesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const students = studentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const attendance = attendanceSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       const tutoring = tutoringSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       const contracts = contractsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
@@ -110,19 +111,30 @@ export const TrainingReport: React.FC = () => {
       const actualAttendance = attendance.filter((a: any) => a.status !== 'LỊCH NGHỈ CHUNG');
 
       // Attendance rate calculation
+      const isPresentStatus = (status: string) =>
+        ['Present', 'Có mặt', 'Đúng giờ', 'Trễ giờ', 'Đi muộn', 'Đến trễ', 'Đã bồi'].includes(status);
+
       let totalPresent = 0;
       let totalRecords = 0;
-      actualAttendance.forEach((a: any) => {
-        if (a.records) {
-          const records = Array.isArray(a.records) ? a.records : Object.values(a.records);
-          records.forEach((r: any) => {
-            totalRecords++;
-            if (r.status === 'Present' || r.status === 'Có mặt') {
-              totalPresent++;
-            }
-          });
-        }
-      });
+      if (studentAttendanceRows.length > 0) {
+        totalRecords = studentAttendanceRows.length;
+        totalPresent = studentAttendanceRows.filter((row: any) => isPresentStatus(row.status)).length;
+      } else {
+        actualAttendance.forEach((a: any) => {
+          if (a.records) {
+            const records = Array.isArray(a.records) ? a.records : Object.values(a.records);
+            records.forEach((r: any) => {
+              totalRecords++;
+              if (isPresentStatus(r.status)) {
+                totalPresent++;
+              }
+            });
+          } else {
+            totalPresent += (a.present || 0) + (a.tutored || 0);
+            totalRecords += a.totalStudents || a.total || 0;
+          }
+        });
+      }
       const attendanceRate = totalRecords > 0 ? (totalPresent / totalRecords) * 100 : 0;
 
       // Tutoring stats
@@ -163,36 +175,48 @@ export const TrainingReport: React.FC = () => {
         renewalRate,
       });
 
+      const studentBelongsToClass = (student: any, classInfo: any) =>
+        student.classId === classInfo.id ||
+        student.classIds?.includes(classInfo.id) ||
+        student.class === classInfo.name ||
+        student.className === classInfo.name ||
+        student.currentClassName === classInfo.name;
+
       // Class summaries with active rate calculation
       const classData: ClassSummary[] = classes.map((c: any) => {
         // Exclude holiday records from class attendance count
         const classAttendance = actualAttendance.filter((a: any) => a.classId === c.id);
+        const classAttendanceDetails = studentAttendanceRows.filter((a: any) => a.classId === c.id);
         const classTutoring = tutoring.filter((t: any) => t.classId === c.id);
-        const classStudents = students.filter((s: any) => s.classId === c.id);
+        const classStudents = students.filter((s: any) => studentBelongsToClass(s, c));
         
         // Track attendance by student
         const studentAttendance: Record<string, { present: number; absent: number; total: number }> = {};
         const studentTutored: Record<string, number> = {}; // count of tutoring sessions
         
-        classAttendance.forEach((a: any) => {
-          if (a.records) {
-            const records = Array.isArray(a.records) ? a.records : Object.values(a.records);
-            records.forEach((r: any) => {
-              const studentId = r.studentId || r.id;
-              if (!studentId) return;
-              
-              if (!studentAttendance[studentId]) {
-                studentAttendance[studentId] = { present: 0, absent: 0, total: 0 };
-              }
-              studentAttendance[studentId].total++;
-              if (r.status === 'Present' || r.status === 'Có mặt') {
-                studentAttendance[studentId].present++;
-              } else {
-                studentAttendance[studentId].absent++;
-              }
-            });
+        const addStudentAttendance = (studentId: string, status: string) => {
+          if (!studentId) return;
+          if (!studentAttendance[studentId]) {
+            studentAttendance[studentId] = { present: 0, absent: 0, total: 0 };
           }
-        });
+          studentAttendance[studentId].total++;
+          if (isPresentStatus(status)) {
+            studentAttendance[studentId].present++;
+          } else {
+            studentAttendance[studentId].absent++;
+          }
+        };
+
+        if (classAttendanceDetails.length > 0) {
+          classAttendanceDetails.forEach((row: any) => addStudentAttendance(row.studentId, row.status));
+        } else {
+          classAttendance.forEach((a: any) => {
+            if (a.records) {
+              const records = Array.isArray(a.records) ? a.records : Object.values(a.records);
+              records.forEach((r: any) => addStudentAttendance(r.studentId || r.id, r.status));
+            }
+          });
+        }
         
         // Count tutoring per student
         classTutoring.forEach((t: any) => {
@@ -221,7 +245,7 @@ export const TrainingReport: React.FC = () => {
           }
         });
         
-        const totalStudentCount = c.currentStudents || c.studentsCount || classStudents.length || 0;
+        const totalStudentCount = classStudents.length;
         const activeStudents = regularStudents + tutoredStudents;
         const activeRate = totalStudentCount > 0 ? (activeStudents / totalStudentCount) * 100 : 0;
         

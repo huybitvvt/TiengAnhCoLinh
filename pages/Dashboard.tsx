@@ -57,6 +57,9 @@ import { useSalaryReport } from '../src/hooks/useSalaryReport';
 import { useProducts } from '../src/hooks/useProducts';
 import { usePermissions } from '../src/hooks/usePermissions';
 import { useAuth } from '../src/hooks/useAuth';
+import { ClassService } from '../src/services/classService';
+import { StudentService } from '../src/services/studentService';
+import { getAllStudentAttendanceRecords } from '../src/services/attendanceService';
 import { ModalPortal } from '@/components/modal-portal';
 
 // Warm Education Color Palette - Teal & Coral Theme
@@ -333,14 +336,12 @@ export const Dashboard: React.FC = () => {
     try {
       setLoading(true);
 
-      // Fetch students
-      const studentsSnap = await getDocs(collection(db, 'students'));
-      const allStudentsData = studentsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as StudentData[];
+      // Fetch training data through services so it respects VITE_DATA_BACKEND.
+      const [allStudentsData, allClasses] = await Promise.all([
+        StudentService.getStudents() as Promise<StudentData[]>,
+        ClassService.getClasses() as Promise<any[]>,
+      ]);
       setAllStudents(allStudentsData);
-
-      // Fetch classes
-      const classesSnap = await getDocs(collection(db, 'classes'));
-      const allClasses = classesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
       // Fetch contracts for revenue
       const contractsSnap = await getDocs(collection(db, 'contracts'));
@@ -372,6 +373,16 @@ export const Dashboard: React.FC = () => {
       // Filter data by selected branch
       const students = filterByBranch(allStudentsData);
       const classes = filterByBranch(allClasses);
+
+      const studentBelongsToClass = (student: any, classInfo: any) =>
+        student.classId === classInfo.id ||
+        student.classIds?.includes(classInfo.id) ||
+        student.class === classInfo.name ||
+        student.className === classInfo.name ||
+        student.currentClassName === classInfo.name;
+
+      const getClassStudents = (classInfo: any) =>
+        students.filter((student: any) => studentBelongsToClass(student, classInfo));
 
       // Filter contracts by student branch (via studentId lookup)
       const studentIds = new Set(students.map(s => s.id));
@@ -532,17 +543,10 @@ export const Dashboard: React.FC = () => {
       
       // Class stats - count students per class (using studentIds or counting from students collection)
       const classStats = classes.map((c: any) => {
-        // Count students in this class from actual student data
-        // Match by: classId, classIds array, class name (legacy), or currentClassName
-        const studentCount = students.filter((s: any) =>
-          s.classId === c.id ||
-          s.classIds?.includes(c.id) ||
-          s.class === c.name ||
-          s.currentClassName === c.name
-        ).length;
+        const studentCount = getClassStudents(c).length;
         return {
           name: c.name || 'Không tên',
-          count: studentCount || c.currentStudents || c.studentIds?.length || 0,
+          count: studentCount,
         };
       }).filter(c => c.count > 0); // Only show classes with students
 
@@ -755,7 +759,7 @@ export const Dashboard: React.FC = () => {
         .map((c: any) => ({
           id: c.id,
           name: c.name || '',
-          studentCount: c.currentStudents || c.studentIds?.length || 0,
+          studentCount: getClassStudents(c).length,
           scheduleDay: c.scheduleDay || c.schedule?.day || '',
           scheduleTime: c.scheduleTime || c.schedule?.time || '',
         }));
@@ -765,9 +769,7 @@ export const Dashboard: React.FC = () => {
       classes
         .filter((c: any) => c.teacherId === staffId || c.assistantId === staffId)
         .forEach((c: any) => {
-          if (c.studentIds) {
-            myStudentIds.push(...c.studentIds);
-          }
+          myStudentIds.push(...getClassStudents(c).map((student: any) => student.id));
         });
       const uniqueMyStudentIds = [...new Set(myStudentIds)];
 
@@ -863,8 +865,7 @@ export const Dashboard: React.FC = () => {
       // Top 5 frequently absent students (from my classes only)
       let topAbsentStudents: { id: string; name: string; absences: number }[] = [];
       try {
-        const attendanceSnap = await getDocs(collection(db, 'studentAttendance'));
-        const attendanceData = attendanceSnap.docs.map(d => d.data());
+        const attendanceData = await getAllStudentAttendanceRecords();
 
         const absenceCounts: { [studentId: string]: number } = {};
         attendanceData

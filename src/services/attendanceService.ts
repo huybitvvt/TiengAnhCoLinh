@@ -282,6 +282,64 @@ export const getStudentAttendance = async (
 };
 
 /**
+ * Get student attendance rows with optional filters.
+ * Used by reports/dashboards so they follow the active data backend.
+ */
+export const getAllStudentAttendanceRecords = async (filters?: {
+  classId?: string;
+  studentId?: string;
+  startDate?: string;
+  endDate?: string;
+}): Promise<StudentAttendance[]> => {
+  if (isSupabaseBackend) {
+    const attendanceRecords = await supabaseAttendanceService.getAttendanceRecords({
+      classId: filters?.classId,
+      startDate: filters?.startDate,
+      endDate: filters?.endDate,
+    });
+
+    const rows = (await Promise.all(
+      attendanceRecords.map(record => supabaseAttendanceService.getStudentAttendance(record.id))
+    )).flat();
+
+    return rows.filter(row => {
+      if (filters?.studentId && row.studentId !== filters.studentId) return false;
+      if (filters?.startDate && row.date < filters.startDate) return false;
+      if (filters?.endDate && row.date > filters.endDate) return false;
+      return true;
+    });
+  }
+
+  try {
+    const constraints: QueryConstraint[] = [];
+    if (filters?.classId) {
+      constraints.push(where('classId', '==', filters.classId));
+    }
+    if (filters?.studentId) {
+      constraints.push(where('studentId', '==', filters.studentId));
+    }
+
+    const q = constraints.length > 0
+      ? query(collection(db, STUDENT_ATTENDANCE_COLLECTION), ...constraints)
+      : query(collection(db, STUDENT_ATTENDANCE_COLLECTION));
+    const snapshot = await getDocs(q);
+
+    let rows = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    } as StudentAttendance));
+
+    if (filters?.startDate) rows = rows.filter(row => row.date >= filters.startDate!);
+    if (filters?.endDate) rows = rows.filter(row => row.date <= filters.endDate!);
+
+    return rows;
+  } catch (error) {
+    console.error('Error getting student attendance records:', error);
+    throw new Error('Không thể tải danh sách điểm danh học viên');
+  }
+};
+
+/**
  * Update attendance record summary
  */
 export const updateAttendanceRecord = async (
