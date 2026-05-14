@@ -13,12 +13,14 @@ import {
   QueryConstraint
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { isSupabaseBackend } from '../config/dataBackend';
 import { ClassModel, ClassStatus, TeacherChangePayload } from '../../types';
 import {
   validateDeleteClass,
   cascadeDeleteClass,
   cascadeUpdateClassName
 } from './dataIntegrityService';
+import { supabaseClassService, supabaseSessionService } from './supabaseTrainingService';
 
 const COLLECTION_NAME = 'classes';
 
@@ -41,6 +43,22 @@ export async function validateTotalSessionsChange(
 
   // Allow increase
   if (newTotal >= currentTotal) {
+    return { valid: true, message: '' };
+  }
+
+  if (isSupabaseBackend) {
+    const sessions = await supabaseSessionService.getSessionsByClass(classId);
+    const sessionsWithAttendance = sessions.filter(
+      session => session.sessionNumber > newTotal && session.attendanceId
+    );
+
+    if (sessionsWithAttendance.length > 0) {
+      return {
+        valid: false,
+        message: `Không thể giảm số buổi vì có ${sessionsWithAttendance.length} buổi học (từ buổi ${newTotal + 1}) đã có điểm danh. Vui lòng xóa điểm danh trước.`
+      };
+    }
+
     return { valid: true, message: '' };
   }
 
@@ -74,6 +92,10 @@ export class ClassService {
     teacherId?: string;
     searchTerm?: string;
   }): Promise<ClassModel[]> {
+    if (isSupabaseBackend) {
+      return supabaseClassService.getClasses(filters);
+    }
+
     try {
       const constraints: QueryConstraint[] = [];
       
@@ -114,6 +136,10 @@ export class ClassService {
   
   // Get single class by ID
   static async getClassById(id: string): Promise<ClassModel | null> {
+    if (isSupabaseBackend) {
+      return supabaseClassService.getClassById(id);
+    }
+
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
       const docSnap = await getDoc(docRef);
@@ -136,6 +162,10 @@ export class ClassService {
   
   // Create new class
   static async createClass(classData: Omit<ClassModel, 'id'>): Promise<string> {
+    if (isSupabaseBackend) {
+      return supabaseClassService.createClass(classData);
+    }
+
     try {
       // Trim name to avoid trailing spaces
       const trimmedName = classData.name?.trim() || classData.name;
@@ -171,6 +201,11 @@ export class ClassService {
   
   // Update class
   static async updateClass(id: string, updates: Partial<ClassModel> & Partial<TeacherChangePayload>): Promise<void> {
+    if (isSupabaseBackend) {
+      await supabaseClassService.updateClass(id, updates);
+      return;
+    }
+
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
 
@@ -228,6 +263,15 @@ export class ClassService {
     message: string;
     cascadeResult?: { studentsUpdated: number; workSessionsUpdated: number };
   }> {
+    if (isSupabaseBackend) {
+      await supabaseClassService.deleteClass(id);
+      return {
+        success: true,
+        message: 'Đã xóa lớp học trên Supabase.',
+        cascadeResult: { studentsUpdated: 0, workSessionsUpdated: 0 },
+      };
+    }
+
     try {
       // Get class info first
       const classData = await this.getClassById(id);

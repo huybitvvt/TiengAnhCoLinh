@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, query, where, Timestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { isSupabaseBackend } from '../config/dataBackend';
 import { ClassModel, ClassStatus } from '../../types';
 import { ClassService } from '../services/classService';
 
@@ -25,6 +26,32 @@ export const useClasses = (filters?: {
 
   // Realtime listener
   useEffect(() => {
+    if (isSupabaseBackend) {
+      let cancelled = false;
+
+      const fetchClasses = async () => {
+        try {
+          setLoading(true);
+          setError(null);
+          const data = await ClassService.getClasses();
+          if (!cancelled) {
+            setAllClasses(data);
+            setLoading(false);
+          }
+        } catch (err: any) {
+          if (!cancelled) {
+            setError(err.message || 'Lỗi khi tải danh sách lớp học');
+            setLoading(false);
+          }
+        }
+      };
+
+      fetchClasses();
+      return () => {
+        cancelled = true;
+      };
+    }
+
     setLoading(true);
     setError(null);
 
@@ -75,7 +102,12 @@ export const useClasses = (filters?: {
   }, [allClasses, filters?.status, filters?.teacherId, filters?.searchTerm]);
 
   const refreshClasses = () => {
-    // No-op for realtime - data auto-updates
+    if (isSupabaseBackend) {
+      ClassService.getClasses()
+        .then(setAllClasses)
+        .catch((err: any) => setError(err.message || 'Lỗi khi tải danh sách lớp học'));
+    }
+    // No-op for Firebase realtime - data auto-updates
   };
 
   const createClass = async (classData: Omit<ClassModel, 'id'>) => {

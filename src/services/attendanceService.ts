@@ -18,7 +18,9 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { isSupabaseBackend } from '../config/dataBackend';
 import { AttendanceRecord, StudentAttendance, AttendanceStatus, StudentStatus } from '../../types';
+import { supabaseAttendanceService, supabaseStudentService } from './supabaseTrainingService';
 
 const ATTENDANCE_COLLECTION = 'attendance';
 const STUDENT_ATTENDANCE_COLLECTION = 'studentAttendance';
@@ -30,6 +32,10 @@ const TUTORING_COLLECTION = 'tutoring';
 export const createAttendanceRecord = async (
   data: Omit<AttendanceRecord, 'id'>
 ): Promise<string> => {
+  if (isSupabaseBackend) {
+    return supabaseAttendanceService.createAttendanceRecord(data);
+  }
+
   try {
     const recordData = {
       ...data,
@@ -51,6 +57,10 @@ export const createAttendanceRecord = async (
  * Get attendance record by ID
  */
 export const getAttendanceRecord = async (id: string): Promise<AttendanceRecord | null> => {
+  if (isSupabaseBackend) {
+    return supabaseAttendanceService.getAttendanceRecord(id);
+  }
+
   try {
     const docRef = doc(db, ATTENDANCE_COLLECTION, id);
     const docSnap = await getDoc(docRef);
@@ -73,6 +83,10 @@ export const getAttendanceRecords = async (filters?: {
   startDate?: string;
   endDate?: string;
 }): Promise<AttendanceRecord[]> => {
+  if (isSupabaseBackend) {
+    return supabaseAttendanceService.getAttendanceRecords(filters);
+  }
+
   try {
     const constraints: QueryConstraint[] = [orderBy('date', 'desc')];
 
@@ -114,6 +128,10 @@ export const checkExistingAttendance = async (
   classId: string,
   date: string
 ): Promise<AttendanceRecord | null> => {
+  if (isSupabaseBackend) {
+    return supabaseAttendanceService.checkExistingAttendance(classId, date);
+  }
+
   try {
     const q = query(
       collection(db, ATTENDANCE_COLLECTION),
@@ -145,6 +163,19 @@ export const saveStudentAttendance = async (
   sessionId?: string,
   attendanceType?: 'session' | 'makeup' | 'manual'
 ): Promise<Map<string, string>> => {  // Return map of studentId -> studentAttendanceId
+  if (isSupabaseBackend) {
+    return supabaseAttendanceService.saveStudentAttendance(
+      attendanceId,
+      students,
+      classId,
+      className,
+      date,
+      sessionNumber,
+      sessionId,
+      attendanceType
+    );
+  }
+
   try {
     console.log('[saveStudentAttendance] Starting...', { attendanceId, studentsCount: students.length });
 
@@ -229,6 +260,10 @@ export const saveStudentAttendance = async (
 export const getStudentAttendance = async (
   attendanceId: string
 ): Promise<StudentAttendance[]> => {
+  if (isSupabaseBackend) {
+    return supabaseAttendanceService.getStudentAttendance(attendanceId);
+  }
+
   try {
     const q = query(
       collection(db, STUDENT_ATTENDANCE_COLLECTION),
@@ -253,6 +288,11 @@ export const updateAttendanceRecord = async (
   id: string,
   data: Partial<AttendanceRecord>
 ): Promise<void> => {
+  if (isSupabaseBackend) {
+    await supabaseAttendanceService.updateAttendanceRecord(id, data);
+    return;
+  }
+
   try {
     const docRef = doc(db, ATTENDANCE_COLLECTION, id);
     await updateDoc(docRef, {
@@ -269,6 +309,11 @@ export const updateAttendanceRecord = async (
  * Delete attendance record and related student records
  */
 export const deleteAttendanceRecord = async (id: string): Promise<void> => {
+  if (isSupabaseBackend) {
+    await supabaseAttendanceService.deleteAttendanceRecord(id);
+    return;
+  }
+
   try {
     const batch = writeBatch(db);
 
@@ -299,6 +344,10 @@ export const findStudentAttendanceRecord = async (
   classId: string,
   date: string
 ): Promise<{ id: string; status: AttendanceStatus } | null> => {
+  if (isSupabaseBackend) {
+    return supabaseAttendanceService.findStudentAttendanceRecord(studentId, classId, date);
+  }
+
   try {
     const q = query(
       collection(db, STUDENT_ATTENDANCE_COLLECTION),
@@ -328,6 +377,11 @@ export const updateStudentAttendanceStatus = async (
   id: string,
   status: AttendanceStatus
 ): Promise<void> => {
+  if (isSupabaseBackend) {
+    await supabaseAttendanceService.updateStudentAttendanceStatus(id, status);
+    return;
+  }
+
   try {
     const docRef = doc(db, STUDENT_ATTENDANCE_COLLECTION, id);
     await updateDoc(docRef, {
@@ -353,6 +407,11 @@ export const createTutoringFromAbsent = async (data: {
   type: 'Nghỉ học' | 'Học yếu';
   studentAttendanceId?: string;  // Optional: pass if already known
 }): Promise<string> => {
+  if (isSupabaseBackend) {
+    console.info('[Supabase] tutoring table is not part of the requested 4-module schema; skipping auto tutoring creation.');
+    return data.studentAttendanceId || 'supabase-tutoring-skipped';
+  }
+
   try {
     const now = new Date().toISOString();
 
@@ -406,6 +465,10 @@ export const countStudentAttendedSessions = async (
   studentId: string,
   classId: string
 ): Promise<number> => {
+  if (isSupabaseBackend) {
+    return supabaseAttendanceService.countStudentAttendedSessions(studentId, classId);
+  }
+
   try {
     const q = query(
       collection(db, STUDENT_ATTENDANCE_COLLECTION),
@@ -677,6 +740,35 @@ export const recalculateStudentStatus = async (
   studentId: string,
   classId?: string
 ): Promise<{ attended: number; registered: number; remaining: number; newStatus: string }> => {
+  if (isSupabaseBackend) {
+    const student = await supabaseStudentService.getStudentById(studentId);
+    if (!student) {
+      throw new Error('Không tìm thấy học viên');
+    }
+
+    const attended = classId
+      ? await supabaseAttendanceService.countStudentAttendedSessions(studentId, classId)
+      : student.attendedSessions || 0;
+    const registered = student.registeredSessions || 0;
+    const remaining = registered - attended - (student.legacyAttendedSessions || 0);
+    let newStatus = student.status;
+
+    const skipStatuses = [StudentStatus.DROPPED, StudentStatus.RESERVED, StudentStatus.TRIAL];
+    if (!skipStatuses.includes(student.status as StudentStatus) && registered > 0) {
+      if (remaining < 0) newStatus = StudentStatus.DEBT;
+      else if (remaining === 0) newStatus = StudentStatus.EXPIRED_FEE;
+      else if (student.status === StudentStatus.EXPIRED_FEE || student.status === StudentStatus.DEBT) newStatus = StudentStatus.ACTIVE;
+    }
+
+    await supabaseStudentService.updateStudent(studentId, {
+      attendedSessions: attended,
+      remainingSessions: remaining,
+      status: newStatus as StudentStatus,
+    });
+
+    return { attended, registered, remaining, newStatus };
+  }
+
   try {
     // Get student data
     const studentRef = doc(db, 'students', studentId);

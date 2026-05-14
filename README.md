@@ -1,351 +1,171 @@
-# EduManager Pro - Education Center Management System
+# Briskyedu - Education Center Management
 
-Vietnamese education center management system built with React 19, TypeScript, and Firebase. Manages students, classes, attendance, staff salaries, contracts, and financial operations for language learning centers.
+Ứng dụng quản lý trung tâm giáo dục bằng React 19, TypeScript và Vite. Repo hiện hỗ trợ 2 backend dữ liệu:
 
-**Status**: v1.0.1 Stable | Jan 30, 2026 | Quality 6.5/10
-**Tech Stack**: React 19 + TypeScript + Firebase (asia-southeast1) + Vite 7
-**Architecture**: Three-Layer Pattern (Services → Hooks → Pages)
+- Firebase/Firestore cho hệ thống gốc.
+- Supabase REST cho các module đào tạo: thời khóa biểu, lớp học, điểm danh, học sinh.
 
-## Quick Stats
+Auth đăng nhập hiện vẫn dùng Firebase Auth. Khi chạy local với `.env.local` hiện tại, dùng Firebase emulator để đăng nhập demo và Supabase để đọc/ghi dữ liệu đào tạo.
 
-| Metric | Value | Details |
-|--------|-------|---------|
-| **Pages** | 44 | 8 domains (Training, Customers, HR, Finance, etc.) |
-| **Services** | 42 | Hybrid: 79% functions, 21% classes |
-| **Hooks** | 38 | 30% real-time (onSnapshot), 70% fetch |
-| **Collections** | 38 active | Firestore NoSQL (49 in rules) |
-| **Cloud Functions** | 16 | Event triggers + scheduled jobs |
-| **Tests** | 294+ | Unit + integration + permissions |
-| **Scripts** | 58 | Maintenance + migrations |
+## Tính năng chính
 
-## Key Features
+- Quản lý học sinh.
+- Quản lý lớp học.
+- Tạo và xem thời khóa biểu theo buổi học.
+- Điểm danh lớp, lưu trạng thái từng học sinh.
+- Chạy local bằng Firebase emulator và Supabase project riêng.
 
-- **Student Management**: Enrollment tracking, multi-class support, classProgress tracking
-- **Class & Attendance**: Real-time scheduling, attendance, tutoring sessions, homework
-- **Staff & HR**: RBAC (11 roles), salary calculation, work confirmations, leave requests
-- **Financials**: Contracts, invoices, debt tracking, revenue reports, settlement PDFs
-- **CRM**: Lead management, campaigns, customer feedback, parent database
-- **Reporting**: Role-based dashboards (Admin/Teacher/CSKH), training & monthly reports
+## Công nghệ
 
-## Quick Start
+- React 19
+- TypeScript
+- Vite 7
+- Firebase Auth / Firestore
+- Supabase REST API
+- Vitest
 
-### Prerequisites
+## Cấu hình Supabase
 
-- Node.js >= 18.x, npm >= 9.x
-- Firebase project with Blaze plan
-- Git for version control
+Chạy các file SQL trong Supabase SQL Editor theo đúng thứ tự:
 
-### Installation
+```sql
+-- 1. Tạo bảng, index, view, trigger và policy authenticated
+supabase/001_training_attendance_schema.sql
 
-```bash
-# Clone repository
-git clone <repository-url>
-cd edumanager-pro
-
-# Install dependencies
-npm install
-
-# Configure environment
-cp .env.example .env.local
-# Edit .env.local with your Firebase credentials
-
-# Start Firebase emulators (optional)
-firebase emulators:start
-
-# Start development server
-npm run dev
+-- 2. Mở policy anon/publishable key cho frontend dev
+supabase/002_training_anon_policies.sql
 ```
 
-### Environment Variables
+Các bảng Supabase được tạo:
 
-Required in `.env.local`:
+- `classes`
+- `students`
+- `student_classes`
+- `class_sessions`
+- `attendance_records`
+- `student_attendance`
+
+Các view hỗ trợ:
+
+- `schedule_view`
+- `attendance_summary_view`
+
+Lưu ý: file `002_training_anon_policies.sql` dùng để app frontend gọi Supabase trực tiếp bằng publishable/anon key trong giai đoạn dev. Khi đưa production nên chuyển sang Supabase Auth hoặc backend API có service role được bảo vệ.
+
+## Cấu hình môi trường
+
+Repo có `.env.example` để tạo cấu hình mới. Theo yêu cầu hiện tại, `.env.local` cũng được commit để clone repo là có sẵn cấu hình demo:
 
 ```env
-VITE_FIREBASE_API_KEY=
-VITE_FIREBASE_AUTH_DOMAIN=
-VITE_FIREBASE_PROJECT_ID=
-VITE_FIREBASE_STORAGE_BUCKET=
-VITE_FIREBASE_MESSAGING_SENDER_ID=
-VITE_FIREBASE_APP_ID=
-GEMINI_API_KEY=  # Optional - AI features
+VITE_FIREBASE_API_KEY=demo-api-key
+VITE_FIREBASE_AUTH_DOMAIN=demo-briskyedu.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=demo-briskyedu
+VITE_FIREBASE_STORAGE_BUCKET=demo-briskyedu.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=123456789
+VITE_FIREBASE_APP_ID=1:123456789:web:demo
+VITE_USE_FIREBASE_EMULATORS=true
+
+VITE_DATA_BACKEND=supabase
+VITE_SUPABASE_REST_URL=https://yhdluaslmontbqopftbd.supabase.co/rest/v1/
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_76Yxjdx3320lz9GzZQWKGw_V767ntZp
 ```
 
-## Development Commands
+`VITE_DATA_BACKEND=supabase` làm cho các module lớp học, học sinh, thời khóa biểu và điểm danh dùng Supabase thay vì Firestore.
+
+## Chạy local
+
+Cài dependency:
 
 ```bash
-# Development
-npm run dev              # Start dev server on port 5173
-npm run build            # Production build
-npm run preview          # Preview production build
-
-# Testing
-npm run test             # Run tests in watch mode
-npm run test:run         # Run tests once
-npm run test:coverage    # Generate coverage report
-
-# Firebase
-npm run setup:admin      # Create initial admin account
-firebase deploy          # Deploy to Firebase Hosting
-firebase deploy --only firestore:rules  # Deploy rules only
-
-# Emulators
-firebase emulators:start # Auth:9099, Firestore:8080, Functions:5001
-
-# Data Maintenance
-npx tsx scripts/seedAllData.ts            # Seed demo data
-npx tsx scripts/checkDataConsistency.ts   # Verify integrity
+npm install
 ```
 
-## Project Structure
-
-**Non-standard**: Source files at root level, not inside `src/`.
-
-```
-/                           # Root level
-├── App.tsx                 # HashRouter routing
-├── index.tsx               # React entry point
-├── types.ts                # Single source of truth (967 LOC)
-├── pages/                  # 44 page components
-├── components/             # Shared UI + dashboard widgets
-├── src/
-│   ├── config/firebase.ts  # Firebase initialization
-│   ├── services/           # 42 Firestore CRUD services
-│   ├── hooks/              # 38 React hooks (real-time + fetch)
-│   ├── utils/              # 14 utilities (currency, date, etc.)
-│   ├── features/           # 32 feature-specific modules
-│   └── test/               # Test setup
-├── functions/              # 16 Cloud Functions
-├── scripts/                # 58 maintenance scripts
-├── docs/                   # Documentation
-└── firestore.rules         # Security rules
-```
-
-## Architecture Overview
-
-### Three-Layer Pattern
-
-```
-┌─────────────────────────────────────────────┐
-│  Pages (44)  →  UI rendering, user events  │
-└────────────────┬────────────────────────────┘
-                 ▼
-┌─────────────────────────────────────────────┐
-│  Hooks (38)  →  React state, real-time     │
-└────────────────┬────────────────────────────┘
-                 ▼
-┌─────────────────────────────────────────────┐
-│  Services (42) → Firestore CRUD + logic    │
-└────────────────┬────────────────────────────┘
-                 ▼
-         Firebase Backend
-```
-
-**Services**: Hybrid pattern (79% function exports, 21% static classes)
-**Hooks**: 30% onSnapshot (real-time), 70% getDocs (fetch)
-**Pages**: Domain-organized, all lazy-loaded
-
-### Domain Organization
-
-- `/training/*` - Classes, schedule, attendance, tutoring
-- `/customers/*` - Students, parents, feedback
-- `/business/*` - Leads, campaigns (CRM)
-- `/hr/*` - Staff, salary, work confirmation
-- `/finance/*` - Contracts, invoices, revenue, debt
-- `/reports/*` - Training, finance, monthly reports
-- `/settings/*` - Products, rooms, curriculum, center config
-
-## Firebase Backend
-
-### Firestore Collections (38 active)
-
-**Core**: students, classes, staff
-**Operational**: attendance, contracts, enrollments, workSessions
-**Finance**: invoices, revenue, debt, settlementInvoices
-**Business**: leads, campaigns, parents, feedback
-**Config**: products, rooms, curriculum, salaryConfigs
-
-See [FIRESTORE_SCHEMA.md](docs/FIRESTORE_SCHEMA.md) for complete schema.
-
-### Cloud Functions (16)
-
-**Triggers**: Class auto-sync, student stats, contract processing, attendance updates
-**Scheduled**: Monthly salary (1st), daily stats (2 AM)
-**Utilities**: Batch operations, PDF generation, schedule parsers
-
-## Authentication & Permissions
-
-- Firebase Auth (email/password)
-- 11 roles: Admin, Kế toán, CSKH Lead/Staff, Sale Lead/Staff, CM Lead/Staff, GV Việt/Nước ngoài, Trợ giảng
-- Permission hook: `src/hooks/usePermissions.tsx`
-- Firestore security rules enforce role-based access
-
-## Testing
+Terminal 1 - chạy Firebase emulator cho đăng nhập demo:
 
 ```bash
-# Run tests
-npm run test            # Watch mode
-npm run test:run        # Single run
-npm run test:coverage   # Coverage report
-
-# Run specific test
-npx vitest run src/services/studentService.test.ts
+npm run emulators
 ```
 
-**Coverage**: 294+ tests (~10% coverage, target 80%+)
-**Framework**: Vitest + React Testing Library + jsdom
-
-## Deployment
+Terminal 2 - seed tài khoản demo vào emulator:
 
 ```bash
-# Build and deploy
+npm run seed:emulator
+```
+
+Terminal 3 - chạy Vite:
+
+```bash
+npm run dev:local
+```
+
+Mở URL Vite in ra trên terminal, thường là:
+
+```text
+http://127.0.0.1:5173/
+```
+
+Tài khoản demo khi dùng emulator:
+
+```text
+Email: admin@brisky.edu.vn
+Password: 123456
+```
+
+## Lệnh phát triển
+
+```bash
+npm run dev          # Chạy Vite mặc định
+npm run dev:local    # Chạy Vite trên 127.0.0.1
+npm run build        # Build production
+npm run preview      # Preview bản build
+npm run test         # Chạy test watch mode
+npm run test:run     # Chạy test một lần
+npm run emulators    # Chạy Firebase Auth + Firestore emulator
+npm run seed:emulator # Seed tài khoản demo cho emulator
+```
+
+## Cấu trúc quan trọng
+
+```text
+pages/
+  Schedule.tsx              # Màn hình thời khóa biểu
+  Attendance.tsx            # Màn hình điểm danh
+
+src/config/
+  firebase.ts               # Firebase init + emulator support
+  dataBackend.ts            # Chọn firebase hoặc supabase
+
+src/hooks/
+  useClasses.ts             # Hook lớp học
+  useStudents.ts            # Hook học sinh
+
+src/services/
+  classService.ts           # Service lớp học
+  studentService.ts         # Service học sinh
+  sessionService.ts         # Service buổi học/thời khóa biểu
+  attendanceService.ts      # Service điểm danh
+  supabaseRest.ts           # Supabase REST client nhẹ
+  supabaseTrainingService.ts # Adapter Supabase cho module đào tạo
+
+supabase/
+  001_training_attendance_schema.sql
+  002_training_anon_policies.sql
+```
+
+## Build kiểm tra
+
+```bash
 npm run build
-firebase deploy
-
-# Deploy rules only
-firebase deploy --only firestore:rules
-
-# View deployment
-firebase hosting:channel:list
 ```
 
-See [Deployment Guide](docs/deployment-guide.md) for detailed instructions.
+Build hiện dùng Vite. Nếu đổi `.env.local`, cần restart dev server để Vite đọc lại biến môi trường.
 
-## Documentation
+## Ghi chú bảo mật
 
-### Core Documentation
-
-- [Project Overview & PDR](docs/project-overview-pdr.md) - Vision, requirements, success metrics
-- [System Architecture](docs/system-architecture.md) - Diagrams, data flow, Cloud Functions
-- [Code Standards](docs/code-standards.md) - Coding patterns, guidelines
-- [Codebase Summary](docs/codebase-summary.md) - Stats, structure, recent changes
-- [Deployment Guide](docs/deployment-guide.md) - Firebase deployment, monitoring
-- [Firestore Schema](docs/FIRESTORE_SCHEMA.md) - Database schema (38 active collections)
-- [Project Roadmap](docs/project-roadmap.md) - Timeline, milestones, v1.1/v1.2 plans
-- [Architecture Decisions](docs/decisions/) - 9 ADRs explaining key choices
-
-### Developer Resources
-
-- [CLAUDE.md](CLAUDE.md) - AI assistant context and workflows
-- [QUICKSTART.md](docs/journals/QUICKSTART.md) - Quick development guide
-- [API Documentation](docs/journals/API.md) - API reference
-
-## Recent Changes
-
-**Jan 30, 2026**: All docs updated with latest codebase metrics (328 files, 104k LOC)
-**Jan 22, 2026**: Edge case fixes & contract date validation
-**Jan 18, 2026**: ClassProgress feature (frontend + scripts + functions)
-**Jan 5, 2026**: Multi-module bug fixes (Training, Customer, HR)
-
-See [Codebase Summary](docs/codebase-summary.md) for detailed history.
-
-## Current Status & Roadmap
-
-**Phase**: Production Stabilization (v1.0.1)
-
-**Priorities**:
-1. Security Hardening (P0): Firestore rules audit, permission checks
-2. Code Quality (P1): DRY violations, hook consistency
-3. User Features (P2): Mobile responsive, notifications
-
-**Quality Score**: 6.5/10
-- ✅ Clean architecture, comprehensive features
-- ⚠️ Test coverage ~10% (target: 80%+)
-- ⚠️ Security hardening needed
-- ⚠️ Technical debt (DRY violations, large files)
-
-See [Project Roadmap](docs/project-roadmap.md) for v1.1/v1.2 plans.
-
-## Contributing
-
-### Development Workflow
-
-1. Create feature branch from `main`
-2. Implement changes following [Code Standards](docs/code-standards.md)
-3. Run tests: `npm run test:run`
-4. Run linting: `npx tsc --noEmit`
-5. Create pull request with description
-6. Code review and approval
-7. Merge to `main`
-
-### Commit Conventions
-
-Follow conventional commits:
-
-```
-feat: Add student import from Excel
-fix: Fix attendance calculation for reserved students
-refactor: Extract student card component
-docs: Update API documentation
-test: Add StudentService tests
-```
-
-## Important Patterns
-
-### Vietnamese Language
-
-All UI text and enums in Vietnamese:
-- Status values: `'Đang học'`, `'Bảo lưu'`, `'Nghỉ học'`
-- Use existing enum values from `types.ts`
-
-### Currency Handling
-
-```typescript
-import { formatCurrency } from '@/src/utils/currencyUtils';
-const formatted = formatCurrency(50000); // "50.000 ₫"
-```
-
-### Timestamp Conversion
-
-```typescript
-// Reading from Firestore
-const student = {
-  ...doc.data(),
-  dob: doc.data().dob?.toDate?.()?.toISOString() || ''
-};
-
-// Writing to Firestore
-import { Timestamp } from 'firebase/firestore';
-await addDoc(collection(db, 'students'), {
-  dob: Timestamp.fromDate(new Date(studentData.dob))
-});
-```
-
-## Troubleshooting
-
-### Build Errors
-
-```bash
-rm -rf node_modules dist && npm install && npm run build
-```
-
-### Permission Denied (Firestore)
-
-Ensure user has staff document: `staff/{userId}`
-
-```bash
-firebase deploy --only firestore:rules
-```
-
-### Environment Variables Not Working
-
-- Variables must start with `VITE_`
-- Rebuild after changing `.env.local`
-- Verify `.gitignore` excludes `.env.local`
-
-## Support & Resources
-
-- **Documentation**: See `docs/` directory
-- **Issues**: GitHub Issues for bug reports
-- **Firebase Console**: https://console.firebase.google.com
-- **Firebase Status**: https://status.firebase.google.com
+- Không commit Supabase `service_role` key, database password hoặc token private.
+- Publishable/anon key có thể dùng ở frontend nhưng phải đi kèm RLS policy phù hợp.
+- Policy anon trong `002_training_anon_policies.sql` đang mở quyền để test nhanh module đào tạo.
 
 ## License
 
-Private - Educational use only
-
----
-
-**Project**: edumanager-pro
-**Repository**: GitHub (private)
-**Firebase Project**: edumanager-pro
-**Last Updated**: January 30, 2026
+Private - Educational use only.

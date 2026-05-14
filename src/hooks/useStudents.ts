@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot, where, doc } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { isSupabaseBackend } from '../config/dataBackend';
 import { Student, StudentStatus } from '../../types';
 import { StudentService } from '../services/studentService';
 
@@ -20,6 +21,32 @@ export const useStudents = (filters?: {
 
   // Realtime listener
   useEffect(() => {
+    if (isSupabaseBackend) {
+      let cancelled = false;
+
+      const fetchStudents = async () => {
+        try {
+          setLoading(true);
+          setError(null);
+          const data = await StudentService.getStudents(filters);
+          if (!cancelled) {
+            setStudents(data);
+            setLoading(false);
+          }
+        } catch (err: any) {
+          if (!cancelled) {
+            setError(err.message || 'Không thể tải danh sách học viên');
+            setLoading(false);
+          }
+        }
+      };
+
+      fetchStudents();
+      return () => {
+        cancelled = true;
+      };
+    }
+
     setLoading(true);
     setError(null);
 
@@ -82,7 +109,12 @@ export const useStudents = (filters?: {
   }, [filters?.status, filters?.classId, filters?.searchTerm]);
 
   const refreshStudents = () => {
-    // With realtime listener, manual refresh is not needed
+    if (isSupabaseBackend) {
+      StudentService.getStudents(filters)
+        .then(setStudents)
+        .catch((err: any) => setError(err.message || 'Không thể tải danh sách học viên'));
+    }
+    // With Firebase realtime listener, manual refresh is not needed
   };
 
   const createStudent = async (studentData: Omit<Student, 'id'>) => {
@@ -131,6 +163,38 @@ export const useStudent = (id: string) => {
 
   // Realtime listener for single student
   useEffect(() => {
+    if (isSupabaseBackend) {
+      let cancelled = false;
+
+      const fetchStudent = async () => {
+        if (!id) {
+          setStudent(null);
+          setLoading(false);
+          return;
+        }
+
+        try {
+          setLoading(true);
+          setError(null);
+          const data = await StudentService.getStudentById(id);
+          if (!cancelled) {
+            setStudent(data);
+            setLoading(false);
+          }
+        } catch (err: any) {
+          if (!cancelled) {
+            setError(err.message || 'Lỗi kết nối dữ liệu');
+            setLoading(false);
+          }
+        }
+      };
+
+      fetchStudent();
+      return () => {
+        cancelled = true;
+      };
+    }
+
     if (!id) {
       setStudent(null);
       setLoading(false);

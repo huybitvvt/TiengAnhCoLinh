@@ -19,6 +19,8 @@ import {
   getDoc,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { isSupabaseBackend } from '../config/dataBackend';
+import { supabaseSessionService } from './supabaseTrainingService';
 
 export interface ClassSession {
   id?: string;
@@ -203,6 +205,10 @@ export const generateSessionsForClass = async (
  * Save generated sessions to Firestore
  */
 export const saveSessionsToFirestore = async (sessions: ClassSession[]): Promise<number> => {
+  if (isSupabaseBackend) {
+    return supabaseSessionService.saveSessions(sessions);
+  }
+
   if (sessions.length === 0) return 0;
   
   const batch = writeBatch(db);
@@ -258,6 +264,10 @@ export const getSessionsByClass = async (
     limit?: number;
   }
 ): Promise<ClassSession[]> => {
+  if (isSupabaseBackend) {
+    return supabaseSessionService.getSessionsByClass(classId, options);
+  }
+
   try {
     // Query without orderBy to avoid index requirements, sort client-side
     const q = query(
@@ -318,6 +328,13 @@ export const getUpcomingSessions = async (
 export const getAllPendingSessions = async (
   options?: { classIds?: string[]; fromDate?: string; toDate?: string }
 ): Promise<ClassSession[]> => {
+  if (isSupabaseBackend) {
+    return supabaseSessionService.getAllPendingSessions({
+      ...options,
+      fromDate: options?.fromDate || formatLocalDate(new Date()),
+    });
+  }
+
   try {
     const today = options?.fromDate || formatLocalDate(new Date());
     
@@ -356,6 +373,11 @@ export const updateSessionStatus = async (
   status: ClassSession['status'],
   attendanceId?: string
 ): Promise<void> => {
+  if (isSupabaseBackend) {
+    await supabaseSessionService.updateSessionStatus(sessionId, status, attendanceId);
+    return;
+  }
+
   try {
     const docRef = doc(db, COLLECTION_NAME, sessionId);
     await updateDoc(docRef, {
@@ -373,6 +395,10 @@ export const updateSessionStatus = async (
  * Delete sessions for a class
  */
 export const deleteSessionsByClass = async (classId: string): Promise<number> => {
+  if (isSupabaseBackend) {
+    return supabaseSessionService.deleteSessionsByClass(classId);
+  }
+
   try {
     const q = query(
       collection(db, COLLECTION_NAME),
@@ -415,6 +441,10 @@ export const deleteSessionsByClass = async (classId: string): Promise<number> =>
  * Ensures sessionNumber is unique and sequential (1, 2, 3, ...)
  */
 export const renumberSessionsByDate = async (classId: string): Promise<number> => {
+  if (isSupabaseBackend) {
+    return supabaseSessionService.renumberSessionsByDate(classId);
+  }
+
   try {
     // Get all sessions for the class (no orderBy to avoid index requirement, sort client-side)
     const q = query(
@@ -497,6 +527,10 @@ export const getSessionByClassAndDate = async (
   classId: string,
   date: string
 ): Promise<ClassSession | null> => {
+  if (isSupabaseBackend) {
+    return supabaseSessionService.getSessionByClassAndDate(classId, date);
+  }
+
   try {
     const q = query(
       collection(db, COLLECTION_NAME),
@@ -526,6 +560,27 @@ export const addMakeupSession = async (
   time?: string,
   note?: string
 ): Promise<string> => {
+  if (isSupabaseBackend) {
+    const dayOfWeek = parseLocalDate(date).getDay();
+    const sessions = await getSessionsByClass(classData.id);
+    const maxSessionNum = sessions.reduce((max, s) => Math.max(max, s.sessionNumber || 0), 0);
+
+    return supabaseSessionService.addMakeupSession(classData, {
+      classId: classData.id,
+      className: classData.name,
+      sessionNumber: maxSessionNum + 1,
+      date,
+      dayOfWeek: DAY_NAMES[dayOfWeek],
+      time,
+      room: classData.room,
+      teacherId: classData.teacherId,
+      teacherName: classData.teacherName,
+      status: 'Học bù',
+      note: note || 'Buổi học bù',
+      createdAt: new Date().toISOString(),
+    });
+  }
+
   try {
     const dayOfWeek = parseLocalDate(date).getDay();
     

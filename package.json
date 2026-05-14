@@ -5,11 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:local": "vite --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "emulators": "firebase emulators:start --project demo-briskyedu --only auth,firestore",
+    "seed:emulator": "node scripts/seed-emulator.cjs",
     "setup:admin": "node scripts/create-admin-staff.js"
   },
   "dependencies": {

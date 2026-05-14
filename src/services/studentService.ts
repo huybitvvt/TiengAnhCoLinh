@@ -20,9 +20,11 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { isSupabaseBackend } from '../config/dataBackend';
 import { Student, StudentStatus, CareLog } from '../../types';
 import { getParent, createParent, findParentByPhone } from './parentService';
 import { convertTimestamp } from '../utils/firestoreUtils';
+import { supabaseStudentService } from './supabaseTrainingService';
 
 const COLLECTION_NAME = 'students';
 
@@ -35,6 +37,10 @@ export class StudentService {
     searchTerm?: string;
     parentId?: string;
   }): Promise<Student[]> {
+    if (isSupabaseBackend) {
+      return supabaseStudentService.getStudents(filters);
+    }
+
     try {
       const constraints: QueryConstraint[] = [];
       
@@ -85,6 +91,10 @@ export class StudentService {
   
   // Get single student by ID
   static async getStudentById(id: string): Promise<Student | null> {
+    if (isSupabaseBackend) {
+      return supabaseStudentService.getStudentById(id);
+    }
+
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
       const docSnap = await getDoc(docRef);
@@ -114,6 +124,10 @@ export class StudentService {
     newParentName?: string;
     newParentPhone?: string;
   }): Promise<string> {
+    if (isSupabaseBackend) {
+      return supabaseStudentService.createStudent(studentData);
+    }
+
     try {
       let parentId = studentData.parentId;
       let parentName = studentData.parentName;
@@ -182,6 +196,11 @@ export class StudentService {
   static async updateStudent(id: string, updates: Partial<Student> & {
     newParentId?: string;
   }): Promise<void> {
+    if (isSupabaseBackend) {
+      await supabaseStudentService.updateStudent(id, updates);
+      return;
+    }
+
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
       
@@ -235,6 +254,11 @@ export class StudentService {
   
   // Delete student
   static async deleteStudent(id: string): Promise<void> {
+    if (isSupabaseBackend) {
+      await supabaseStudentService.deleteStudent(id);
+      return;
+    }
+
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
       await deleteDoc(docRef);
@@ -284,6 +308,17 @@ export class StudentService {
     classId?: string,
     className?: string
   ): Promise<void> {
+    if (isSupabaseBackend) {
+      await Promise.all(studentIds.map(studentId =>
+        supabaseStudentService.updateStudent(studentId, {
+          status,
+          classId,
+          className,
+        } as Partial<Student>)
+      ));
+      return;
+    }
+
     try {
       const batch = writeBatch(db);
       
