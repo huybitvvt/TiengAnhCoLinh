@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Mail, AlertCircle, ArrowRight, BookOpen } from 'lucide-react';
+import { Lock, Mail, AlertCircle, ArrowRight, BookOpen, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../src/hooks/useAuth';
 
 const REMEMBER_ME_KEY = 'brisky_remember_email';
@@ -14,6 +14,7 @@ export const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(() => {
     return !!localStorage.getItem(REMEMBER_ME_KEY);
   });
@@ -198,15 +199,26 @@ export const Login: React.FC = () => {
                 <div className="relative">
                   <input
                     id="password"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     onFocus={() => setPasswordFocused(true)}
                     onBlur={() => setPasswordFocused(false)}
-                    className="w-full px-4 py-4 bg-white border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[#FF6B5A] transition-all text-gray-900 shadow-sm hover:border-gray-300"
+                    className="w-full pl-4 pr-20 py-4 bg-white border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[#FF6B5A] transition-all text-gray-900 shadow-sm hover:border-gray-300"
                     required
                     autoComplete="current-password"
                   />
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setShowPassword((current) => !current)}
+                    className={`absolute right-11 top-1/2 -translate-y-1/2 p-1 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[#FF6B5A]/30 ${
+                      passwordFocused || showPassword ? 'text-[#FF6B5A]' : 'text-gray-400 hover:text-gray-600'
+                    }`}
+                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
                   <Lock 
                     size={20} 
                     className={`absolute right-4 top-1/2 -translate-y-1/2 transition-colors ${
